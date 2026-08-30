@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <title>I.Bunyanovsky Library</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>I.Bunyanovsky Library</h1>
+      <p class="subtitle">CD・DVDライブラリ</p>
+    </div>
+    <button id="settingsBtn" class="ghost hidden">設定</button>
+  </header>
+
+  <main class="container">
+    <section id="setupNotice" class="card warning hidden">
+      <h2>初期設定が必要です</h2>
+      <p><code>config.js</code> にSupabaseの接続情報を設定してください。</p>
+    </section>
+
+    <section id="authView" class="card">
+      <h2>I.Bunyanovsky Library</h2>
+      <p class="muted">共通パスワードを入力してください。</p>
+      <form id="loginForm" class="stack">
+        <label>共通パスワード
+          <input id="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="primary" type="submit">ライブラリを開く</button>
+      </form>
+      <p id="authMessage" class="message"></p>
+    </section>
+
+    <section id="nameView" class="card hidden">
+      <h2>入力者名の設定</h2>
+      <p class="muted">この端末で登録する人の名前を設定してください。設定画面から変更できます。</p>
+      <form id="nameForm" class="stack">
+        <label>入力者名<input id="operatorNameInput" maxlength="50" required /></label>
+        <button class="primary" type="submit">設定する</button>
+      </form>
+    </section>
+
+    <section id="appView" class="hidden">
+      <section class="card card-title-row"><div><span class="muted">入力者</span> <strong id="operatorNameDisplay"></strong></div><button id="changeOperatorBtn" class="ghost" type="button">変更</button></section>
+      <section class="stats-grid">
+        <div class="stat"><span id="countAll">0</span><small>総所蔵数</small></div>
+        <div class="stat"><span id="countCD">0</span><small>CD</small></div>
+        <div class="stat"><span id="countDVD">0</span><small>DVD / BD</small></div>
+        <div class="stat"><span id="countUnreviewed">0</span><small>未整理</small></div>
+      </section>
+
+      <section class="card">
+        <h2>新規登録</h2>
+        <div class="scan-actions">
+          <button id="scanBtn" class="primary">バーコードを読み取る</button>
+          <button id="manualBtn" class="secondary">手動で登録</button>
+        </div>
+
+        <div id="scannerPanel" class="hidden">
+          <video id="scannerVideo" playsinline></video>
+          <div class="scan-help">バーコードを枠内に入れてください。</div>
+          <button id="stopScanBtn" class="ghost">読み取りを終了</button>
+        </div>
+
+        <div class="barcode-manual">
+          <label>
+            JAN / EANコード
+            <div class="inline">
+              <input id="barcodeInput" inputmode="numeric" placeholder="例: 4988000000000" />
+              <button id="lookupBtn" class="secondary" type="button">検索</button>
+            </div>
+          </label>
+        </div>
+
+        <p id="lookupMessage" class="message"></p>
+      </section>
+
+      <section id="editorCard" class="card hidden">
+        <div class="card-title-row">
+          <h2 id="editorTitle">登録内容</h2>
+          <span id="duplicateBadge" class="badge danger hidden">登録済み</span>
+        </div>
+        <form id="itemForm" class="form-grid">
+          <input id="itemId" type="hidden" />
+          <label>バーコード<input id="fBarcode" /></label>
+          <label>媒体
+            <select id="fMediaType">
+              <option value="CD">CD</option>
+              <option value="DVD">DVD</option>
+              <option value="Blu-ray">Blu-ray</option>
+              <option value="CD-R">CD-R</option>
+              <option value="DVD-R">DVD-R</option>
+              <option value="Other">その他</option>
+            </select>
+          </label>
+          <label class="span-2">タイトル<input id="fTitle" required /></label>
+          <label class="span-2">アーティスト / 主演者<input id="fArtist" /></label>
+          <label>発売年<input id="fYear" inputmode="numeric" /></label>
+          <label>レーベル<input id="fLabel" /></label>
+          <label>規格品番<input id="fCatalogNo" /></label>
+          <label>枚数<input id="fDiscCount" type="number" min="1" value="1" /></label>
+          <label class="span-2">作曲者<input id="fComposer" placeholder="複数の場合は「;」区切り" /></label>
+          <label class="span-2">指揮者<input id="fConductor" /></label>
+          <label class="span-2">演奏者 / ソリスト<input id="fPerformers" /></label>
+          <label class="span-2">団体<input id="fEnsemble" placeholder="オーケストラ、吹奏楽団、合唱団など" /></label>
+          <label class="span-2">ジャンル
+            <select id="fGenre">
+              <option value="">未設定</option>
+              <option value="クラシック">クラシック</option>
+              <option value="吹奏楽">吹奏楽</option>
+              <option value="ジャズ">ジャズ</option>
+              <option value="その他">その他</option>
+            </select>
+          </label>
+          <label>収納場所<input id="fLocation" placeholder="例: 書斎 棚A-2" /></label>
+          <label>所蔵数<input id="fQuantity" type="number" min="1" value="1" /></label>
+          <label>入力者<input id="fOperator" readonly /></label>
+          <label>タグ<input id="fTags" placeholder="例: ホルン; コンクール; 学校演奏会" /></label>
+          <label class="span-2">メモ<textarea id="fNotes" rows="4"></textarea></label>
+          <label class="checkbox span-2">
+            <input id="fNeedsReview" type="checkbox" />
+            後で詳細確認する
+          </label>
+          <div class="span-2 actions">
+            <button class="primary" type="submit">保存</button>
+            <button id="cancelEditBtn" class="ghost" type="button">閉じる</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="card-title-row">
+          <h2>ライブラリ</h2>
+          <button id="refreshBtn" class="ghost">更新</button>
+        </div>
+        <div class="filters">
+          <input id="searchInput" placeholder="タイトル、作曲者、演奏者、団体、規格品番などを検索" />
+          <select id="genreFilter">
+            <option value="">すべてのジャンル</option>
+            <option value="クラシック">クラシック</option>
+            <option value="吹奏楽">吹奏楽</option>
+            <option value="ジャズ">ジャズ</option>
+            <option value="その他">その他</option>
+          </select>
+          <select id="reviewFilter">
+            <option value="">整理状態: すべて</option>
+            <option value="true">未整理のみ</option>
+            <option value="false">整理済みのみ</option>
+          </select>
+        </div>
+        <div id="libraryList" class="library-list"></div>
+      </section>
+    </section>
+  </main>
+
+  <template id="itemTemplate">
+    <article class="library-item">
+      <div class="item-main">
+        <div class="item-topline">
+          <span class="media-pill"></span>
+          <span class="genre-pill"></span>
+          <span class="review-pill hidden">未整理</span>
+        </div>
+        <h3 class="item-title"></h3>
+        <p class="item-artist"></p>
+        <p class="item-meta"></p>
+        <p class="item-location"></p>
+        <p class="item-operator"></p>
+      </div>
+      <button class="edit-item ghost">編集</button>
+    </article>
+  </template>
+
+  <div id="settingsModal" class="modal hidden"><div class="modal-card"><h2>設定</h2><button id="changeNameInSettings" class="secondary">入力者名を変更</button><button id="lockBtn" class="secondary">この端末をロック</button><button id="closeSettingsBtn" class="ghost">閉じる</button></div></div>
+
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
