@@ -3,5 +3,5 @@
 window.APP_CONFIG = {
   SUPABASE_URL: "https://tsxckrlvsrevpqtfuhso.supabase.co",
   SUPABASE_PUBLISHABLE_KEY: "sb_publishable_DLvQObXed8voIrrcujUJkg_V6q8U9YY",
-  SHARED_AUTH_EMAIL: "bunchan.flute+I.Bunyanovsky-Library@gmail.com"
+  SHARED_AUTH_EMAIL: "bunchan.flute+i.bunyanovsky-library@gmail.com"
 };
