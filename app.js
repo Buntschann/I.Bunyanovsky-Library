@@ -303,26 +303,40 @@ async function startScanner() {
 
   try {
     scanner = new ZXing.BrowserMultiFormatReader();
-    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
-    const preferred = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
 
-    await scanner.decodeFromVideoDevice(
-      preferred?.deviceId,
+    const constraints = {
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" }
+      }
+    };
+
+    await scanner.decodeFromConstraints(
+      constraints,
       "scannerVideo",
       async (result, err) => {
         if (result) {
           const code = result.getText();
+
           stopScanner();
+
           $("barcodeInput").value = code;
+          $("lookupMessage").textContent =
+            `バーコードを読み取りました：${code}`;
+
           await lookupBarcode(code);
         }
       }
     );
-    $("lookupMessage").textContent = "";
+
+    $("lookupMessage").textContent =
+      "バーコードを枠内に入れてください。";
+
   } catch (err) {
     console.error(err);
+
     $("lookupMessage").textContent =
-      "カメラを起動できませんでした。ブラウザのカメラ権限を確認するか、バーコードを手入力してください。";
+      "カメラを起動できませんでした。Safariのカメラ権限を確認してください。";
   }
 }
 
