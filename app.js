@@ -1,3 +1,7 @@
+const APP_VERSION = "1.2.0";
+const VERSION_URL = "./version.json";
+const HISTORY_URL = "./update-history.json";
+
 const cfg = window.APP_CONFIG || {};
 const isConfigured =
   cfg.SUPABASE_URL &&
@@ -300,43 +304,22 @@ function formPayload() {
 async function startScanner() {
   $("scannerPanel").classList.remove("hidden");
   $("lookupMessage").textContent = "カメラを起動しています…";
-
   try {
     scanner = new ZXing.BrowserMultiFormatReader();
-
-    const constraints = {
-      audio: false,
-      video: {
-        facingMode: { ideal: "environment" }
+    const constraints = { audio:false, video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1280 }, height:{ ideal:720 } } };
+    await scanner.decodeFromConstraints(constraints, "scannerVideo", async (result, err) => {
+      if (result) {
+        const code = result.getText();
+        stopScanner();
+        $("barcodeInput").value = code;
+        $("lookupMessage").textContent = `バーコードを読み取りました：${code}`;
+        await lookupBarcode(code);
       }
-    };
-
-    await scanner.decodeFromConstraints(
-      constraints,
-      "scannerVideo",
-      async (result, err) => {
-        if (result) {
-          const code = result.getText();
-
-          stopScanner();
-
-          $("barcodeInput").value = code;
-          $("lookupMessage").textContent =
-            `バーコードを読み取りました：${code}`;
-
-          await lookupBarcode(code);
-        }
-      }
-    );
-
-    $("lookupMessage").textContent =
-      "バーコードを枠内に入れてください。";
-
+    });
+    $("lookupMessage").textContent = "バーコードを画面内に入れてください。";
   } catch (err) {
-    console.error(err);
-
-    $("lookupMessage").textContent =
-      "カメラを起動できませんでした。Safariのカメラ権限を確認してください。";
+    console.error("Camera error:", err);
+    $("lookupMessage").textContent = "カメラを起動できませんでした。Safariのカメラ権限を確認してください。";
   }
 }
 
@@ -347,3 +330,56 @@ function stopScanner() {
   scanner = null;
   $("scannerPanel").classList.add("hidden");
 }
+
+$("currentVersionText").textContent = `v${APP_VERSION}`;
+$("checkUpdateBtn").addEventListener("click", async()=>{ $("settingsModal").classList.add("hidden"); await checkForUpdate(true); });
+$("updateNowBtn").addEventListener("click", forceAppUpdate);
+$("showHistoryBtn").addEventListener("click", async()=>{ $("settingsModal").classList.add("hidden"); await showUpdateHistory(); });
+$("closeHistoryBtn").addEventListener("click", ()=>$("historyModal").classList.add("hidden"));
+
+function compareVersions(a,b){
+  const pa=String(a).split(".").map(Number), pb=String(b).split(".").map(Number), n=Math.max(pa.length,pb.length);
+  for(let i=0;i<n;i++){const av=pa[i]||0,bv=pb[i]||0;if(av>bv)return 1;if(av<bv)return -1;} return 0;
+}
+async function checkForUpdate(showResult=false){
+  try{
+    const res=await fetch(`${VERSION_URL}?t=${Date.now()}`,{cache:"no-store"}); if(!res.ok) throw new Error(res.status);
+    const info=await res.json();
+    if(compareVersions(info.version,APP_VERSION)>0){
+      $("updateBannerTitle").textContent=`新しいバージョン v${info.version} があります`;
+      $("updateBannerText").textContent=info.summary||"最新版に更新できます。";
+      $("updateBanner").classList.remove("hidden");
+      if(showResult) showToast(`v${info.version} に更新できます`);
+    }else{
+      $("updateBanner").classList.add("hidden");
+      if(showResult) showToast("現在のバージョンは最新です");
+    }
+  }catch(e){console.error(e); if(showResult) showToast("更新情報を確認できませんでした");}
+}
+async function forceAppUpdate(){
+  showToast("最新版を読み込んでいます…");
+  try{
+    if("serviceWorker" in navigator){for(const reg of await navigator.serviceWorker.getRegistrations()) await reg.unregister();}
+    if("caches" in window){for(const key of await caches.keys()) await caches.delete(key);}
+  }catch(e){console.warn(e);}
+  const url=new URL(location.href); url.searchParams.set("update",Date.now()); location.replace(url.toString());
+}
+async function showUpdateHistory(){
+  $("historyModal").classList.remove("hidden"); const box=$("historyList"); box.innerHTML='<p class="muted">読み込んでいます…</p>';
+  try{
+    const res=await fetch(`${HISTORY_URL}?t=${Date.now()}`,{cache:"no-store"}); if(!res.ok) throw new Error(res.status);
+    const rows=await res.json(); box.innerHTML="";
+    rows.forEach(entry=>{
+      const sec=document.createElement("section"); sec.className="history-entry";
+      const h=document.createElement("h3"); h.textContent=`v${entry.version} — ${entry.date}`; sec.appendChild(h);
+      if(entry.summary){const p=document.createElement("p");p.textContent=entry.summary;sec.appendChild(p);}
+      if(entry.changes?.length){const ul=document.createElement("ul");entry.changes.forEach(c=>{const li=document.createElement("li");li.textContent=c;ul.appendChild(li);});sec.appendChild(ul);}
+      box.appendChild(sec);
+    });
+  }catch(e){box.innerHTML='<p class="muted">アップデート履歴を読み込めませんでした。</p>';}
+}
+function showToast(message){
+  const t=$("toast"); t.textContent=message; t.classList.remove("hidden"); clearTimeout(showToast.timer);
+  showToast.timer=setTimeout(()=>t.classList.add("hidden"),2500);
+}
+checkForUpdate(false);
