@@ -1,4 +1,4 @@
-const APP_VERSION="1.5.2";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.6.0";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 const PROVIDER_DEFAULTS={
   rakuten:true,
@@ -117,6 +117,13 @@ function mapServerCandidate(r,barcode){
     barcode,
     media_type:r.mediaType||'CD',
     title:r.title||'',
+    title_kana:r.titleKana||'',
+    artist_kana:r.artistKana||'',
+    release_date_text:r.releaseDateText||'',
+    album_type:r.albumType||'',
+    playlist:Array.isArray(r.playlist)?r.playlist:[],
+    books_genre_id:r.booksGenreId||'',
+    raw_source:r.rawSource||null,
     artist:r.artist||'',
     release_year:r.year||'',
     label:r.label||'',
@@ -131,17 +138,17 @@ function mapServerCandidate(r,barcode){
   };
 }
 function guessMediaType(r){const f=(r.media||[]).map(m=>(m.format||'').toLowerCase()).join(' ');if(f.includes('blu-ray'))return'Blu-ray';if(f.includes('dvd'))return'DVD';return'CD'}
-function openEditor(i){$('editorCard').classList.remove('hidden');$('itemId').value=i.id||'';$('fBarcode').value=i.barcode||'';$('fMediaType').value=i.media_type||'CD';$('fTitle').value=i.title||'';$('fArtist').value=i.artist||'';$('fYear').value=i.release_year||'';$('fLabel').value=i.label||'';$('fCatalogNo').value=i.catalog_no||'';$('fDiscCount').value=i.disc_count||1;$('fComposer').value=i.composer||'';$('fConductor').value=i.conductor||'';$('fPerformers').value=i.performers||'';$('fEnsemble').value=i.ensemble||'';$('fGenre').value=i.genre||'';$('fLocation').value=i.location||'';$('fQuantity').value=i.quantity||1;$('fOperator').value=operatorName;$('fTags').value=(i.tags||[]).join('; ');$('fNotes').value=i.notes||'';
+function openEditor(i){$('editorCard').classList.remove('hidden');$('itemId').value=i.id||'';$('fBarcode').value=i.barcode||'';$('fMediaType').value=i.media_type||'CD';$('fTitle').value=i.title||'';$('fArtist').value=i.artist||'';$('fTitleKana').value=i.title_kana||'';$('fArtistKana').value=i.artist_kana||'';$('fYear').value=i.release_year||'';$('fReleaseDateText').value=i.release_date_text||'';$('fLabel').value=i.label||'';$('fCatalogNo').value=i.catalog_no||'';$('fDiscCount').value=i.disc_count||1;$('fAlbumType').value=i.album_type||'';$('fComposer').value=i.composer||'';$('fConductor').value=i.conductor||'';$('fPerformers').value=i.performers||'';$('fEnsemble').value=i.ensemble||'';$('fGenre').value=i.genre||'';$('fLocation').value=i.location||'';$('fQuantity').value=i.quantity||1;$('fOperator').value=operatorName;$('fPlaylist').value=(i.playlist||[]).join('\n');$('fTags').value=(i.tags||[]).join('; ');$('fNotes').value=i.notes||'';
   $('fCoverUrl').value=i.cover_url||'';
   $('fSourceName').value=i.source_name||'';
-  $('fSourceUrl').value=i.source_url||'';
+  $('fSourceUrl').value=i.source_url||'';$('fBooksGenreId').value=i.books_genre_id||'';$('fRawSource').value=i.raw_source?JSON.stringify(i.raw_source):'';
   updateCoverPreview(i.cover_url||'',i.source_name||'',i.source_url||'');
   $('fNeedsReview').checked=!!i.needs_review;$('editorTitle').textContent=i.id?'登録内容を編集':'登録内容を確認';const dup=i.barcode&&library.some(x=>x.barcode===i.barcode&&x.id!==i.id);$('duplicateBadge').classList.toggle('hidden',!dup);$('editorCard').scrollIntoView({behavior:'smooth',block:'start'})}
 $('itemForm').addEventListener('submit',async e=>{e.preventDefault();const p=formPayload(),id=$('itemId').value||null;let error;if(id){p.updated_at=new Date().toISOString();({error}=await sb.from('library_items').update(p).eq('id',id))}else({error}=await sb.from('library_items').insert(p));if(error){alert('保存できませんでした。');return}$('editorCard').classList.add('hidden');$('barcodeInput').value='';$('lookupMessage').textContent='保存しました。';await loadLibrary()});
-function formPayload(){return{barcode:$('fBarcode').value.trim()||null,media_type:$('fMediaType').value,title:$('fTitle').value.trim(),artist:$('fArtist').value.trim()||null,release_year:Number($('fYear').value)||null,label:$('fLabel').value.trim()||null,catalog_no:$('fCatalogNo').value.trim()||null,disc_count:Number($('fDiscCount').value)||1,composer:$('fComposer').value.trim()||null,conductor:$('fConductor').value.trim()||null,performers:$('fPerformers').value.trim()||null,ensemble:$('fEnsemble').value.trim()||null,genre:$('fGenre').value||null,location:$('fLocation').value.trim()||null,quantity:Number($('fQuantity').value)||1,tags:$('fTags').value.split(';').map(x=>x.trim()).filter(Boolean),notes:$('fNotes').value.trim()||null,needs_review:$('fNeedsReview').checked,
+function formPayload(){return{barcode:$('fBarcode').value.trim()||null,media_type:$('fMediaType').value,title:$('fTitle').value.trim(),title_kana:$('fTitleKana').value.trim()||null,artist:$('fArtist').value.trim()||null,artist_kana:$('fArtistKana').value.trim()||null,release_year:Number($('fYear').value)||null,release_date_text:$('fReleaseDateText').value.trim()||null,label:$('fLabel').value.trim()||null,catalog_no:$('fCatalogNo').value.trim()||null,disc_count:Number($('fDiscCount').value)||1,album_type:$('fAlbumType').value.trim()||null,composer:$('fComposer').value.trim()||null,conductor:$('fConductor').value.trim()||null,performers:$('fPerformers').value.trim()||null,ensemble:$('fEnsemble').value.trim()||null,genre:$('fGenre').value||null,location:$('fLocation').value.trim()||null,quantity:Number($('fQuantity').value)||1,playlist:$('fPlaylist').value.split(/\n+/).map(x=>x.trim()).filter(Boolean),tags:$('fTags').value.split(';').map(x=>x.trim()).filter(Boolean),notes:$('fNotes').value.trim()||null,needs_review:$('fNeedsReview').checked,
     cover_url:$('fCoverUrl').value||null,
     source_name:$('fSourceName').value||null,
-    source_url:$('fSourceUrl').value||null,
+    source_url:$('fSourceUrl').value||null,books_genre_id:$('fBooksGenreId').value||null,raw_source:(()=>{try{return $('fRawSource').value?JSON.parse($('fRawSource').value):null}catch{return null}})(),
     operator_name:operatorName}}
 
 function updateCoverPreview(url,sourceName,sourceUrl){
