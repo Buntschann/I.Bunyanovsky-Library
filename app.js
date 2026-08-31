@@ -1,4 +1,29 @@
-const APP_VERSION="1.5.0";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.5.1";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+
+const PROVIDER_DEFAULTS={
+  rakuten:true,
+  musicbrainz:true,
+  discogs:true,
+  cdstub:true,
+  upcitemdb:true
+};
+let providerAvailability={};
+let providerSettings=loadProviderSettings();
+
+function loadProviderSettings(){
+  try{
+    return {
+      ...PROVIDER_DEFAULTS,
+      ...JSON.parse(localStorage.getItem("ib_provider_settings")||"{}")
+    };
+  }catch{
+    return {...PROVIDER_DEFAULTS};
+  }
+}
+function saveProviderSettings(){
+  localStorage.setItem("ib_provider_settings",JSON.stringify(providerSettings));
+}
+
 if(!configured){$('setupNotice').classList.remove('hidden')}else{const remember=localStorage.getItem('ib_remember_session')!=='false';sb=supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:remember,autoRefreshToken:true,detectSessionInUrl:false}});init()}
 async function init(){await checkForUpdate(false);const{data}=await sb.auth.getSession();if(data.session)enterAfterAuth()}
 $('gateForm').addEventListener('submit',async e=>{e.preventDefault();$('gateMessage').textContent='確認しています…';const remember=$('rememberSession').checked;localStorage.setItem('ib_remember_session',String(remember));const{error}=await sb.auth.signInWithPassword({email:cfg.SHARED_AUTH_EMAIL,password:$('sharedPassword').value});$('sharedPassword').value='';if(error){$('gateMessage').textContent='パスワードが正しくありません。';return}$('gateMessage').textContent='';enterAfterAuth()});
@@ -135,7 +160,7 @@ $('diagnoseSearchBtn').addEventListener('click',async()=>{
   try{
     const {data,error}=await sb.functions.invoke('lookup-media',{body:{diagnostic:true}});
     if(error)throw error;
-    const lines=(data.providers||[]).map(x=>`${x.enabled?'✓':'－'} ${x.name}`).join('\n');
+    const lines=(data.providers||[]).map(x=>`${x.available?'✓':'－'} ${x.name}`).join('\n');
     alert(`検索サービス診断\n\n${lines}\n\n✓：利用可能\n－：追加設定で利用可能`);
   }catch(e){
     console.error(e);
@@ -149,5 +174,5 @@ $('closeProviderModalBtn').addEventListener('click',()=>{$('providerModal').clas
 $('enableRecommendedBtn').addEventListener('click',()=>{providerSettings={rakuten:true,musicbrainz:true,discogs:true,cdstub:true,upcitemdb:false};saveProviderSettings();renderProviderSettings()});
 $('enableAllAvailableBtn').addEventListener('click',()=>{Object.keys(PROVIDER_DEFAULTS).forEach(k=>providerSettings[k]=providerAvailability[k]!==false);saveProviderSettings();renderProviderSettings()});
 async function getProviderStatus(){const {data,error}=await sb.functions.invoke('lookup-media',{body:{diagnostic:true}});if(error)throw error;providerAvailability={};(data.providers||[]).forEach(x=>providerAvailability[x.key]=!!x.available);return data.providers||[]}
-async function openProviderSettings(){$('providerModal').classList.remove('hidden');$('providerList').innerHTML='<p class="muted">検索サービスを確認しています…</p>';try{renderProviderSettings(await getProviderStatus())}catch(e){console.error(e);$('providerList').innerHTML='<p class="muted">検索サービスの状態を取得できませんでした。</p>'}}
+async function openProviderSettings(){$('providerModal').classList.remove('hidden');$('providerList').innerHTML='<p class="muted">検索サービスを確認しています…</p>';try{renderProviderSettings(await getProviderStatus())}catch(e){console.error(e);$('providerList').innerHTML='<p class="muted">検索サービスの状態を取得できませんでした。もう一度お試しください。</p>'}}
 function renderProviderSettings(providers){providers=providers||[{key:'rakuten',name:'楽天ブックス CD/DVD',available:providerAvailability.rakuten!==false},{key:'musicbrainz',name:'MusicBrainz',available:providerAvailability.musicbrainz!==false},{key:'discogs',name:'Discogs',available:providerAvailability.discogs!==false},{key:'cdstub',name:'MusicBrainz CDStub',available:providerAvailability.cdstub!==false},{key:'upcitemdb',name:'UPCitemdb',available:providerAvailability.upcitemdb!==false}];const list=$('providerList');list.innerHTML='';providers.forEach(p=>{const row=document.createElement('label');row.className=`provider-row ${p.available?'':'unavailable'}`;const main=document.createElement('div');main.className='provider-main';const title=document.createElement('strong');title.textContent=p.name;const sub=document.createElement('small');sub.textContent=p.available?'利用可能':'追加設定が必要です';main.append(title,sub);const toggle=document.createElement('input');toggle.type='checkbox';toggle.className='provider-switch';toggle.checked=!!providerSettings[p.key]&&!!p.available;toggle.disabled=!p.available;toggle.addEventListener('change',()=>{providerSettings[p.key]=toggle.checked;saveProviderSettings()});row.append(main,toggle);list.appendChild(row)})}
