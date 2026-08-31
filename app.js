@@ -1,4 +1,4 @@
-const APP_VERSION="1.3.0";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.3.1";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 if(!configured){$('setupNotice').classList.remove('hidden')}else{const remember=localStorage.getItem('ib_remember_session')!=='false';sb=supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:remember,autoRefreshToken:true,detectSessionInUrl:false}});init()}
 async function init(){await checkForUpdate(false);const{data}=await sb.auth.getSession();if(data.session)enterAfterAuth()}
 $('gateForm').addEventListener('submit',async e=>{e.preventDefault();$('gateMessage').textContent='確認しています…';const remember=$('rememberSession').checked;localStorage.setItem('ib_remember_session',String(remember));const{error}=await sb.auth.signInWithPassword({email:cfg.SHARED_AUTH_EMAIL,password:$('sharedPassword').value});$('sharedPassword').value='';if(error){$('gateMessage').textContent='パスワードが正しくありません。';return}$('gateMessage').textContent='';enterAfterAuth()});
@@ -9,22 +9,186 @@ $('manualBtn').addEventListener('click',()=>openEditor({}));$('refreshBtn').addE
 async function loadLibrary(){const{data,error}=await sb.from('library_items').select('*').order('created_at',{ascending:false});if(error){alert('ライブラリを取得できませんでした。');return}library=data||[];updateStats();renderLibrary()}function qty(a){return a.reduce((s,x)=>s+(Number(x.quantity)||1),0)}function updateStats(){$('countAll').textContent=qty(library);$('countCD').textContent=qty(library.filter(x=>['CD','CD-R'].includes(x.media_type)));$('countVideo').textContent=qty(library.filter(x=>['DVD','DVD-R','Blu-ray'].includes(x.media_type)));$('countReview').textContent=library.filter(x=>x.needs_review).length}
 function renderLibrary(){const q=$('searchInput').value.trim().toLowerCase(),g=$('genreFilter').value,r=$('reviewFilter').value,list=$('libraryList');list.innerHTML='';const items=library.filter(x=>{const hay=[x.title,x.artist,x.composer,x.conductor,x.performers,x.ensemble,x.label,x.catalog_no,x.barcode,x.location,x.operator_name,...(x.tags||[])].filter(Boolean).join(' ').toLowerCase();return(!q||hay.includes(q))&&(!g||x.genre===g)&&(!r||String(x.needs_review)===r)});if(!items.length){list.innerHTML='<p class="muted">該当する資料はありません。</p>';return}items.forEach(item=>{const n=$('itemTemplate').content.cloneNode(true);n.querySelector('.media-pill').textContent=item.media_type||'CD';n.querySelector('.genre-pill').textContent=item.genre||'ジャンル未設定';n.querySelector('.review-pill').classList.toggle('hidden',!item.needs_review);n.querySelector('.item-title').textContent=item.title;n.querySelector('.item-artist').textContent=item.artist||'';n.querySelector('.item-meta').textContent=[item.composer,item.conductor,item.ensemble,item.release_year,item.catalog_no].filter(Boolean).join(' / ');n.querySelector('.item-location').textContent=[item.location?`収納：${item.location}`:'',item.quantity>1?`所蔵数：${item.quantity}`:''].filter(Boolean).join(' / ');n.querySelector('.item-operator').textContent=`入力者：${item.operator_name||'-'}`;n.querySelector('.edit-item').addEventListener('click',()=>openEditor(item));list.appendChild(n)})}
 
-async function lookupBarcode(raw){const barcode=raw.replace(/\D/g,'');if(!barcode){$('lookupMessage').textContent='バーコードを入力してください。';return}$('barcodeInput').value=barcode;$('sourceMessage').classList.add('hidden');const existing=library.filter(x=>x.barcode===barcode);$('lookupMessage').textContent=existing.length?`同じバーコードがすでに${existing.length}件あります。情報を確認してください。`:'外部データベースを検索しています…';
+async function lookupBarcode(raw){
+  const barcode=raw.replace(/\D/g,'');
+  if(!barcode){
+    $('lookupMessage').textContent='バーコードを入力してください。';
+    return;
+  }
+
+  $('barcodeInput').value=barcode;
+  $('sourceMessage').classList.add('hidden');
+
+  const existing=library.filter(x=>x.barcode===barcode);
+  $('lookupMessage').textContent=existing.length
+    ? `同じバーコードがすでに${existing.length}件あります。情報を確認してください。`
+    : '外部データベースを検索しています…';
+
+  const status=[];
+
+  // 1. MusicBrainz Release
   try{
-    let result=await searchMusicBrainz(barcode);if(result){openEditor(mapMusicBrainz(result,barcode));showSource('MusicBrainz');$('lookupMessage').textContent='候補を取得しました。内容を確認して保存してください。';return}
-    result=await searchMusicBrainzCDStub(barcode);if(result){openEditor(mapCDStub(result,barcode));showSource('MusicBrainz CDStub');$('lookupMessage').textContent='基本情報を取得しました。内容を確認して保存してください。';return}
-    result=await searchUPCitemdb(barcode);if(result){openEditor(mapUPCitemdb(result,barcode));showSource('UPCitemdb');$('lookupMessage').textContent='商品情報を取得しました。内容を確認して保存してください。';return}
-    openEditor({barcode,needs_review:true});$('lookupMessage').textContent='外部データベースに一致する資料が見つかりませんでした。手動で登録してください。';showSource('検索結果なし');
-  }catch(error){console.error(error);openEditor({barcode,needs_review:true});$('lookupMessage').textContent='外部データベースへの接続中にエラーが発生しました。手動で登録することもできます。';showSource('通信エラー')}
+    const result=await searchMusicBrainz(barcode);
+    if(result){
+      openEditor(mapMusicBrainz(result,barcode));
+      showSource('MusicBrainz');
+      $('lookupMessage').textContent='候補を取得しました。内容を確認して保存してください。';
+      return;
+    }
+    status.push('MusicBrainz：該当なし');
+  }catch(error){
+    console.warn('MusicBrainz error',error);
+    status.push('MusicBrainz：接続失敗');
+  }
+
+  // MusicBrainz APIの1秒/回制限に配慮
+  await sleep(1100);
+
+  // 2. MusicBrainz CDStub
+  try{
+    const result=await searchMusicBrainzCDStub(barcode);
+    if(result){
+      openEditor(mapCDStub(result,barcode));
+      showSource('MusicBrainz CDStub');
+      $('lookupMessage').textContent='基本情報を取得しました。内容を確認して保存してください。';
+      return;
+    }
+    status.push('CDStub：該当なし');
+  }catch(error){
+    console.warn('CDStub error',error);
+    status.push('CDStub：接続失敗');
+  }
+
+  // 3. UPCitemdb
+  try{
+    const result=await searchUPCitemdb(barcode);
+    if(result){
+      openEditor(mapUPCitemdb(result,barcode));
+      showSource('UPCitemdb');
+      $('lookupMessage').textContent='商品情報を取得しました。内容を確認して保存してください。';
+      return;
+    }
+    status.push('UPCitemdb：該当なし');
+  }catch(error){
+    console.warn('UPCitemdb error',error);
+    status.push('UPCitemdb：接続失敗');
+  }
+
+  openEditor({barcode,needs_review:true});
+
+  const hadConnectionError=status.some(x=>x.includes('接続失敗'));
+  if(hadConnectionError){
+    $('lookupMessage').textContent=
+      '検索できなかったデータベースがあります。該当情報も見つからなかったため、手動登録画面を開きました。';
+    showSource(status.join(' / '));
+  }else{
+    $('lookupMessage').textContent=
+      '外部データベースに一致する資料が見つかりませんでした。手動で登録してください。';
+    showSource('検索結果なし');
+  }
 }
-function showSource(s){$('sourceMessage').textContent=`取得元：${s}`;$('sourceMessage').classList.remove('hidden')}
-async function fetchJson(url,opts={}){const r=await fetch(url,{...opts,headers:{Accept:'application/json',...(opts.headers||{})}});if(r.status===404)return null;if(r.status===429){const e=new Error('RATE_LIMIT');e.code='RATE_LIMIT';throw e}if(!r.ok)throw new Error(`HTTP_${r.status}`);return await r.json()}
-async function searchMusicBrainz(barcode){const d=await fetchJson(`https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(`barcode:${barcode}`)}&fmt=json&limit=5`);if(!d?.releases?.length)return null;const best=d.releases[0];try{return await fetchJson(`https://musicbrainz.org/ws/2/release/${best.id}?inc=artists+labels+media&fmt=json`)||best}catch{return best}}
-async function searchMusicBrainzCDStub(barcode){const d=await fetchJson(`https://musicbrainz.org/ws/2/cdstub/?query=${encodeURIComponent(`barcode:${barcode}`)}&fmt=json&limit=5`);return d?.['cdstubs']?.[0]||d?.cdstubs?.[0]||null}
-async function searchUPCitemdb(barcode){const d=await fetchJson(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);return d?.items?.[0]||null}
-function mapMusicBrainz(r,barcode){return{barcode,media_type:guessMediaType(r),title:r.title||'',artist:r['artist-credit']?.map(a=>a.name).join(', ')||'',release_year:r.date?Number(String(r.date).slice(0,4))||'':'',label:r['label-info']?.map(x=>x.label?.name).filter(Boolean).join('; ')||'',catalog_no:r['label-info']?.map(x=>x['catalog-number']).filter(Boolean).join('; ')||'',disc_count:r.media?.length||1,needs_review:true,musicbrainz_release_id:r.id}}
-function mapCDStub(r,barcode){return{barcode,media_type:'CD',title:r.title||'',artist:r.artist||'',disc_count:1,needs_review:true,notes:'MusicBrainz CDStubから基本情報を取得'}}
-function mapUPCitemdb(r,barcode){const title=r.title||r.product_name||'';const artist=r.brand||r.publisher||'';return{barcode,media_type:'CD',title,artist,needs_review:true,notes:[r.description,r.category?`カテゴリ：${r.category}`:''].filter(Boolean).join('\n')}}
+
+function sleep(ms){
+  return new Promise(resolve=>setTimeout(resolve,ms));
+}
+
+function showSource(s){
+  $('sourceMessage').textContent=`検索状況：${s}`;
+  $('sourceMessage').classList.remove('hidden');
+}
+
+async function fetchJson(url,opts={}){
+  const r=await fetch(url,{
+    ...opts,
+    cache:'no-store',
+    headers:{
+      Accept:'application/json',
+      ...(opts.headers||{})
+    }
+  });
+
+  if(r.status===404)return null;
+
+  if(r.status===429){
+    const e=new Error('RATE_LIMIT');
+    e.code='RATE_LIMIT';
+    throw e;
+  }
+
+  if(!r.ok)throw new Error(`HTTP_${r.status}`);
+  return await r.json();
+}
+
+async function searchMusicBrainz(barcode){
+  const d=await fetchJson(
+    `https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(`barcode:${barcode}`)}&fmt=json&limit=5`
+  );
+
+  if(!d?.releases?.length)return null;
+
+  const best=d.releases[0];
+
+  // 詳細取得はなくても基本情報で登録できるため、
+  // ここで追加APIを連続呼び出ししない。
+  return best;
+}
+
+async function searchMusicBrainzCDStub(barcode){
+  const d=await fetchJson(
+    `https://musicbrainz.org/ws/2/cdstub/?query=${encodeURIComponent(`barcode:${barcode}`)}&fmt=json&limit=5`
+  );
+
+  return d?.cdstubs?.[0] || d?.['cdstubs']?.[0] || null;
+}
+
+async function searchUPCitemdb(barcode){
+  const d=await fetchJson(
+    `https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`
+  );
+
+  return d?.items?.[0] || null;
+}
+
+function mapMusicBrainz(r,barcode){
+  return{
+    barcode,
+    media_type:guessMediaType(r),
+    title:r.title||'',
+    artist:r['artist-credit']?.map(a=>a.name).join(', ')||'',
+    release_year:r.date?Number(String(r.date).slice(0,4))||'':'',
+    label:r['label-info']?.map(x=>x.label?.name).filter(Boolean).join('; ')||'',
+    catalog_no:r['label-info']?.map(x=>x['catalog-number']).filter(Boolean).join('; ')||'',
+    disc_count:r.media?.length||1,
+    needs_review:true,
+    musicbrainz_release_id:r.id
+  };
+}
+
+function mapCDStub(r,barcode){
+  return{
+    barcode,
+    media_type:'CD',
+    title:r.title||'',
+    artist:r.artist||'',
+    disc_count:1,
+    needs_review:true,
+    notes:'MusicBrainz CDStubから基本情報を取得'
+  };
+}
+
+function mapUPCitemdb(r,barcode){
+  const title=r.title||r.product_name||'';
+  const artist=r.brand||r.publisher||'';
+  return{
+    barcode,
+    media_type:'CD',
+    title,
+    artist,
+    needs_review:true,
+    notes:[r.description,r.category?`カテゴリ：${r.category}`:'']
+      .filter(Boolean).join('\n')
+  };
+}
 function guessMediaType(r){const f=(r.media||[]).map(m=>(m.format||'').toLowerCase()).join(' ');if(f.includes('blu-ray'))return'Blu-ray';if(f.includes('dvd'))return'DVD';return'CD'}
 function openEditor(i){$('editorCard').classList.remove('hidden');$('itemId').value=i.id||'';$('fBarcode').value=i.barcode||'';$('fMediaType').value=i.media_type||'CD';$('fTitle').value=i.title||'';$('fArtist').value=i.artist||'';$('fYear').value=i.release_year||'';$('fLabel').value=i.label||'';$('fCatalogNo').value=i.catalog_no||'';$('fDiscCount').value=i.disc_count||1;$('fComposer').value=i.composer||'';$('fConductor').value=i.conductor||'';$('fPerformers').value=i.performers||'';$('fEnsemble').value=i.ensemble||'';$('fGenre').value=i.genre||'';$('fLocation').value=i.location||'';$('fQuantity').value=i.quantity||1;$('fOperator').value=operatorName;$('fTags').value=(i.tags||[]).join('; ');$('fNotes').value=i.notes||'';$('fNeedsReview').checked=!!i.needs_review;$('editorTitle').textContent=i.id?'登録内容を編集':'登録内容を確認';const dup=i.barcode&&library.some(x=>x.barcode===i.barcode&&x.id!==i.id);$('duplicateBadge').classList.toggle('hidden',!dup);$('editorCard').scrollIntoView({behavior:'smooth',block:'start'})}
 $('itemForm').addEventListener('submit',async e=>{e.preventDefault();const p=formPayload(),id=$('itemId').value||null;let error;if(id){p.updated_at=new Date().toISOString();({error}=await sb.from('library_items').update(p).eq('id',id))}else({error}=await sb.from('library_items').insert(p));if(error){alert('保存できませんでした。');return}$('editorCard').classList.add('hidden');$('barcodeInput').value='';$('lookupMessage').textContent='保存しました。';await loadLibrary()});
