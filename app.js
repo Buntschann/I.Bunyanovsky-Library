@@ -1,4 +1,4 @@
-const APP_VERSION="1.5.1";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.5.2";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 const PROVIDER_DEFAULTS={
   rakuten:true,
@@ -95,8 +95,15 @@ async function lookupBarcode(raw){
 function formatAttempts(attempts){
   if(!attempts?.length)return '検索履歴なし';
   return attempts.map(x=>{
-    const s=x.status==='found'?'取得':x.status==='not_found'?'該当なし':x.status==='disabled'?'未設定':x.status==='skipped'?'OFF':'接続失敗';
-    return `${x.name}：${s}`;
+    const s=x.status==='found'?'取得'
+      :x.status==='not_found'?'該当なし'
+      :x.status==='disabled'?'未設定'
+      :x.status==='skipped'?'OFF'
+      :'接続失敗';
+    const detail=(x.status==='error'&&x.detail)
+      ? `（${String(x.detail).replace(/^Error:\s*/,'').slice(0,90)}）`
+      : '';
+    return `${x.name}：${s}${detail}`;
   }).join(' / ');
 }
 

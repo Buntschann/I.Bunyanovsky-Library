@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.5.2",
+    "date": "2026-08-31",
+    "summary": "楽天API接続修正",
+    "changes": [
+      "楽天Web ServiceへのリクエストにRefererとOriginを追加",
+      "SupabaseプロジェクトURLを楽天の許可サイト照合に使用",
+      "楽天APIのHTTPエラー内容を検索結果に表示",
+      "MusicBrainz CDStubへの連続アクセス間隔を延長",
+      "外部APIのタイムアウトを10秒に調整"
+    ]
+  },
+  {
     "version": "1.5.1",
     "date": "2026-08-31",
     "summary": "検索サービス設定画面の不具合修正",
