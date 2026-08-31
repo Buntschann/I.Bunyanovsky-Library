@@ -1,4 +1,4 @@
 {
-  "version": "1.4.0",
-  "summary": "検索処理をSupabase Edge Functionへ移行し、日本盤・音盤を幅広く探索するArchive Explorerを追加しました。"
+  "version": "1.5.0",
+  "summary": "検索サービスのON/OFF、未設定表示、楽天ブックス・Discogsの追加設定に対応しました。"
 }
