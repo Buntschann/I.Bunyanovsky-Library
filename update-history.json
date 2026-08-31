@@ -1,5 +1,21 @@
 [
   {
+    "version": "1.4.0",
+    "date": "2026-08-31",
+    "summary": "Archive Explorer：検索基盤を刷新",
+    "changes": [
+      "外部データベース検索をSupabase Edge Function経由に変更",
+      "楽天ブックスCD/DVD検索に対応（追加設定時）",
+      "Discogs検索に対応（追加設定時）",
+      "MusicBrainz、CDStub、UPCitemdbをサーバー側で統合",
+      "検索先ごとの成否を表示",
+      "ジャケット画像の取得・表示に対応",
+      "登録データに取得元を記録",
+      "設定に検索サービス診断を追加",
+      "検索中にArchive Explorer表示を追加"
+    ]
+  },
+  {
     "version": "1.3.1",
     "date": "2026-08-31",
     "summary": "外部データベース検索の安定性を改善",

@@ -1,4 +1,4 @@
 {
-  "version": "1.3.1",
-  "summary": "外部データベース検索のエラー処理を改善し、1つの検索先が失敗しても次の検索先へ進むようにしました。"
+  "version": "1.4.0",
+  "summary": "検索処理をSupabase Edge Functionへ移行し、日本盤・音盤を幅広く探索するArchive Explorerを追加しました。"
 }
