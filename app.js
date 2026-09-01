@@ -1,4 +1,4 @@
-const APP_VERSION="1.6.0";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.7.0";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 const PROVIDER_DEFAULTS={
   rakuten:true,
@@ -30,9 +30,69 @@ $('gateForm').addEventListener('submit',async e=>{e.preventDefault();$('gateMess
 function enterAfterAuth(){$('gateView').classList.add('hidden');$('settingsBtn').classList.remove('hidden');if(!operatorName){$('nameView').classList.remove('hidden');$('appView').classList.add('hidden')}else showApp()}
 $('nameForm').addEventListener('submit',e=>{e.preventDefault();setOperator($('operatorNameInput').value.trim())});$('changeOperatorBtn').addEventListener('click',promptOperator);$('changeNameInSettings').addEventListener('click',()=>{closeSettings();promptOperator()});function promptOperator(){const name=prompt('入力者名を入力してください。',operatorName);if(name!==null&&name.trim())setOperator(name.trim())}function setOperator(name){operatorName=name;localStorage.setItem('ib_operator_name',name);$('nameView').classList.add('hidden');showApp()}function showApp(){$('appView').classList.remove('hidden');$('operatorNameDisplay').textContent=operatorName;$('fOperator').value=operatorName;loadLibrary()}
 $('settingsBtn').addEventListener('click',()=>$('settingsModal').classList.remove('hidden'));$('closeSettingsBtn').addEventListener('click',closeSettings);function closeSettings(){$('settingsModal').classList.add('hidden')}$('logoutBtn').addEventListener('click',async()=>{await sb.auth.signOut();closeSettings();$('appView').classList.add('hidden');$('settingsBtn').classList.add('hidden');$('gateView').classList.remove('hidden')});
-$('manualBtn').addEventListener('click',()=>openEditor({}));$('refreshBtn').addEventListener('click',loadLibrary);$('refreshLibraryBtn').addEventListener('click',loadLibrary);$('searchInput').addEventListener('input',renderLibrary);$('genreFilter').addEventListener('change',renderLibrary);$('reviewFilter').addEventListener('change',renderLibrary);$('cancelEditBtn').addEventListener('click',()=>$('editorCard').classList.add('hidden'));$('lookupBtn').addEventListener('click',()=>lookupBarcode($('barcodeInput').value.trim()));$('scanBtn').addEventListener('click',startScanner);$('stopScanBtn').addEventListener('click',stopScanner);
+$('manualBtn').addEventListener('click',()=>openEditor({}));$('metadataSearchBtn').addEventListener('click',openMetadataSearch);$('closeMetadataSearchBtn').addEventListener('click',closeMetadataSearch);$('clearMetadataSearchBtn').addEventListener('click',()=>{$('metadataSearchForm').reset();$('metadataSearchResults').innerHTML='';$('metadataSearchStatus').textContent=''});$('metadataSearchForm').addEventListener('submit',searchMetadata);$('refreshBtn').addEventListener('click',loadLibrary);$('refreshLibraryBtn').addEventListener('click',loadLibrary);$('searchInput').addEventListener('input',renderLibrary);$('genreFilter').addEventListener('change',renderLibrary);$('reviewFilter').addEventListener('change',renderLibrary);$('cancelEditBtn').addEventListener('click',()=>$('editorCard').classList.add('hidden'));$('lookupBtn').addEventListener('click',()=>lookupBarcode($('barcodeInput').value.trim()));$('scanBtn').addEventListener('click',startScanner);$('stopScanBtn').addEventListener('click',stopScanner);
 async function loadLibrary(){const{data,error}=await sb.from('library_items').select('*').order('created_at',{ascending:false});if(error){alert('ライブラリを取得できませんでした。');return}library=data||[];updateStats();renderLibrary()}function qty(a){return a.reduce((s,x)=>s+(Number(x.quantity)||1),0)}function updateStats(){$('countAll').textContent=qty(library);$('countCD').textContent=qty(library.filter(x=>['CD','CD-R'].includes(x.media_type)));$('countVideo').textContent=qty(library.filter(x=>['DVD','DVD-R','Blu-ray'].includes(x.media_type)));$('countReview').textContent=library.filter(x=>x.needs_review).length}
 function renderLibrary(){const q=$('searchInput').value.trim().toLowerCase(),g=$('genreFilter').value,r=$('reviewFilter').value,list=$('libraryList');list.innerHTML='';const items=library.filter(x=>{const hay=[x.title,x.artist,x.composer,x.conductor,x.performers,x.ensemble,x.label,x.catalog_no,x.barcode,x.location,x.operator_name,...(x.tags||[])].filter(Boolean).join(' ').toLowerCase();return(!q||hay.includes(q))&&(!g||x.genre===g)&&(!r||String(x.needs_review)===r)});if(!items.length){list.innerHTML='<p class="muted">該当する資料はありません。</p>';return}items.forEach(item=>{const n=$('itemTemplate').content.cloneNode(true);n.querySelector('.media-pill').textContent=item.media_type||'CD';n.querySelector('.genre-pill').textContent=item.genre||'ジャンル未設定';n.querySelector('.review-pill').classList.toggle('hidden',!item.needs_review);n.querySelector('.item-title').textContent=item.title;n.querySelector('.item-artist').textContent=item.artist||'';n.querySelector('.item-meta').textContent=[item.composer,item.conductor,item.ensemble,item.release_year,item.catalog_no].filter(Boolean).join(' / ');n.querySelector('.item-location').textContent=[item.location?`収納：${item.location}`:'',item.quantity>1?`所蔵数：${item.quantity}`:''].filter(Boolean).join(' / ');n.querySelector('.item-operator').textContent=`入力者：${item.operator_name||'-'}`;const cover=n.querySelector('.item-cover');if(item.cover_url){cover.src=item.cover_url;cover.classList.remove('hidden')}n.querySelector('.edit-item').addEventListener('click',()=>openEditor(item));list.appendChild(n)})}
+
+
+function openMetadataSearch(){
+  $('metadataSearchModal').classList.remove('hidden');
+  $('metadataSearchStatus').textContent='';
+  setTimeout(()=>$('msCatalogNo').focus(),50);
+}
+function closeMetadataSearch(){$('metadataSearchModal').classList.add('hidden')}
+
+async function searchMetadata(e){
+  e.preventDefault();
+  const search={
+    catalogNo:$('msCatalogNo').value.trim(),
+    title:$('msTitle').value.trim(),
+    artist:$('msArtist').value.trim(),
+    label:$('msLabel').value.trim(),
+    year:$('msYear').value.trim()
+  };
+  if(!search.catalogNo&&!search.title&&!search.artist&&!search.label){
+    $('metadataSearchStatus').textContent='規格品番・タイトル・アーティスト・レーベルのいずれかを入力してください。';return;
+  }
+  $('metadataSearchResults').innerHTML='';
+  $('metadataSearchStatus').textContent='外部データベースを横断検索しています…';
+  try{
+    const {data,error}=await sb.functions.invoke('lookup-media',{body:{search,providers:providerSettings}});
+    if(error)throw error;
+    $('metadataSearchStatus').textContent=data?.found
+      ? `${data.candidates.length}件の候補が見つかりました。盤面・ケースの品番や発売年を確認して選択してください。`
+      : `候補が見つかりませんでした。${formatAttempts(data?.attempts||[])}`;
+    renderMetadataCandidates(data?.candidates||[]);
+    if(data?.attempts?.length)showSource(formatAttempts(data.attempts));
+  }catch(err){console.error(err);$('metadataSearchStatus').textContent='外部データベース検索に失敗しました。検索条件を変えて再度お試しください。';}
+}
+
+function renderMetadataCandidates(items){
+  const list=$('metadataSearchResults');list.innerHTML='';
+  if(!items.length){list.innerHTML='<div class="candidate-empty">候補はありません。条件を少し減らすか、表記を変えて検索してください。</div>';return;}
+  items.forEach((item,index)=>{
+    const card=document.createElement('article');card.className='candidate-card';
+    let cover;
+    if(item.coverUrl){cover=document.createElement('img');cover.className='candidate-cover';cover.src=item.coverUrl;cover.alt='';}
+    else{cover=document.createElement('div');cover.className='candidate-cover placeholder';cover.textContent='💿';}
+    const body=document.createElement('div');
+    const title=document.createElement('h3');title.className='candidate-title';title.textContent=item.title||'タイトル不明';
+    if(item.matchScore){const badge=document.createElement('span');badge.className='candidate-score';badge.textContent=`一致度 ${Math.round(item.matchScore)}`;title.appendChild(badge)}
+    const sub=document.createElement('p');sub.className='candidate-sub';sub.textContent=item.artist||'';
+    const meta=document.createElement('p');meta.className='candidate-meta';meta.textContent=[item.label,item.catalogNo,item.year,item.mediaType].filter(Boolean).join(' / ');
+    const src=document.createElement('p');src.className='candidate-source';src.textContent=`取得元：${item.source||'-'}`;
+    body.append(title,sub,meta,src);
+    const btn=document.createElement('button');btn.className='primary candidate-select';btn.type='button';btn.textContent='この盤を選ぶ';btn.addEventListener('click',()=>selectMetadataCandidate(item));
+    card.append(cover,body,btn);list.appendChild(card);
+  });
+}
+
+function selectMetadataCandidate(item){
+  closeMetadataSearch();
+  openEditor(mapServerCandidate(item,''));
+  $('lookupMessage').textContent=`${item.source||'外部データベース'}の候補を登録画面に反映しました。内容を確認してください。`;
+  showSource(`取得元：${item.source||'-'} / バーコードなし検索`);
+}
 
 async function lookupBarcode(raw){
   const barcode=raw.replace(/\D/g,'');
