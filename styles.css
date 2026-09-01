@@ -76,3 +76,8 @@
   font-weight:700;
 }
 .danger-button:active{transform:translateY(1px)}
+
+/* v1.11.0 資料別フォーム完全分離 */
+#mediaFormSection.hidden,#scoreFormSection.hidden{display:none!important}
+.score-clean-form{margin-top:4px}
+#editorCard form>section{margin-top:10px}

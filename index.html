@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111827">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>文谷家ライブラリ</title>
-  <link rel="stylesheet" href="./styles.css?v=1.10.3">
+  <link rel="stylesheet" href="./styles.css?v=1.11.0">
   <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -26,80 +26,33 @@
       <div><strong>Archive Explorer</strong><p id="explorerText">外部データベースを探索しています…</p></div>
     </div>
     <p id="sourceMessage" class="source-message hidden"></p></section>
-<section id="editorCard" class="card hidden"><div class="row-between"><h2 id="editorTitle">登録内容</h2><div class="editor-head-actions"><button id="enrichScoreBtn" type="button" class="secondary small hidden">外部DBから空欄を補完</button><span id="duplicateBadge" class="badge danger hidden">同一バーコードあり</span></div></div><form id="itemForm" class="form-grid"><input id="itemId" type="hidden">
-      <div id="coverPreviewWrap" class="cover-preview-wrap span2 hidden">
-        <img id="coverPreview" alt="ジャケット画像">
-        <div>
-          <strong id="coverSourceTitle">外部データベースから取得</strong>
-          <p id="coverSourceText" class="muted"></p>
-        </div>
-      </div><label>バーコード<input id="fBarcode"></label><label>媒体・資料形態<select id="fMediaType"><option>CD</option><option>DVD</option><option>Blu-ray</option><option>CD-R</option><option>DVD-R</option><option>楽譜</option><option value="Other">その他</option></select></label><input id="fMaterialType" type="hidden" value="media"><label class="span2">タイトル<input id="fTitle" required></label><label class="span2">アーティスト / 著者<input id="fArtist"></label>
-<label>タイトル（カナ）<input id="fTitleKana"></label>
-<label>アーティスト（カナ）<input id="fArtistKana"></label><label>発売年<input id="fYear" inputmode="numeric"></label>
-<label>発売日（原表記）<input id="fReleaseDateText"></label><label>レーベル<input id="fLabel"></label><label>規格品番<input id="fCatalogNo"></label><label>枚数<input id="fDiscCount" type="number" min="1" value="1"></label>
-<label>商品区分<input id="fAlbumType" placeholder="アルバム、シングルなど"></label><div id="scoreFields" class="span2 score-fields hidden">
-<div class="section-title">楽譜情報</div>
-<div class="form-grid inner-grid">
-<label>ISBN<input id="fIsbn" inputmode="numeric" placeholder="978..."></label>
-<label>ISMN<input id="fIsmn" placeholder="979-0-..."></label>
-<label class="span2">出版社名<input id="fPublisher"></label>
+<section id="editorCard" class="card hidden">
+<div class="row-between"><h2 id="editorTitle">登録内容を確認</h2><div class="editor-head-actions"><button id="enrichScoreBtn" type="button" class="secondary small hidden">外部DBから空欄を補完</button><span id="duplicateBadge" class="badge danger hidden">同一バーコードあり</span></div></div>
+<form id="itemForm"><input id="itemId" type="hidden"><input id="fMaterialType" type="hidden" value="media">
+<div id="coverPreviewWrap" class="cover-preview-wrap hidden"><img id="coverPreview" alt="表紙・ジャケット画像"><div><strong id="coverSourceTitle">外部データベースから取得</strong><p id="coverSourceText" class="muted"></p></div></div>
+<section id="mediaFormSection"><div class="form-grid">
+<label>バーコード<input id="fBarcode"></label><label>媒体<select id="fMediaType"><option>CD</option><option>DVD</option><option>Blu-ray</option><option>CD-R</option><option>DVD-R</option><option value="Other">その他</option></select></label>
+<label class="span2">タイトル<input id="fTitle"></label><label class="span2">アーティスト / 主演者<input id="fArtist"></label><label>タイトル（カナ）<input id="fTitleKana"></label><label>アーティスト（カナ）<input id="fArtistKana"></label>
+<label>発売年<input id="fYear" inputmode="numeric"></label><label>発売日（原表記）<input id="fReleaseDateText"></label><label>レーベル<input id="fLabel"></label><label>規格品番<input id="fCatalogNo"></label><label>枚数<input id="fDiscCount" type="number" min="1" value="1"></label><label>商品区分<input id="fAlbumType"></label>
+<label class="span2">作曲者<input id="fComposer"></label><label class="span2">指揮者<input id="fConductor"></label><label class="span2">演奏者 / ソリスト<input id="fPerformers"></label><label class="span2">団体<input id="fEnsemble"></label><label>ジャンル<select id="fGenre"><option value="">未設定</option><option>クラシック</option><option>吹奏楽</option><option>ジャズ</option><option>ボサノバ</option><option>合唱</option><option>オペラ・声楽</option><option>現代音楽</option><option>映画・舞台音楽</option><option>サウンドトラック</option><option>ポップス</option><option>ロック</option><option>歌謡曲・演歌</option><option>民族音楽・ワールド</option><option>落語</option><option>教材・資料</option><option>その他</option></select></label><label>収納場所<input id="fLocation"></label><label>所蔵数<input id="fQuantity" type="number" min="1" value="1"></label><label>入力者<input id="fOperator" readonly></label>
+<label class="span2">収録曲<textarea id="fPlaylist" rows="7" placeholder="1行に1曲"></textarea></label><label class="span2">タグ<input id="fTags" placeholder="「;」区切り"></label><label class="span2">メモ<textarea id="fNotes" rows="4"></textarea></label>
+</div></section>
+<section id="scoreFormSection" class="hidden"><div class="form-grid score-clean-form">
+<label class="span2">楽譜名<input id="fScoreTitle"></label>
+<label>作曲家名<input id="fScoreComposer"></label><label>作曲家名（読み）<input id="fComposerKana"></label>
 <label>作詞者名<input id="fLyricist"></label><label>作詞者名（読み）<input id="fLyricistKana"></label>
-<label>作曲家名（読み）<input id="fComposerKana"></label><label>編曲者<input id="fArranger"></label>
-<label>楽譜種別<select id="fScoreFormat"><option value="">未設定</option><option>合唱譜</option><option>総譜</option><option>パート譜</option><option>ピアノ譜</option><option>ヴォーカルスコア</option><option>器楽譜</option><option>その他</option></select></label>
-<div class="tag-field">
-      <span class="field-label">編成</span>
-      <div id="voicingTagPicker" class="tag-picker"></div>
-      <div class="tag-add-row"><input id="newVoicingTag" placeholder="新しい編成タグ"><button id="addVoicingTagBtn" type="button" class="ghost small">追加</button></div>
-      <input id="fVoicingTags" type="hidden">
-    </div>
-<div class="tag-field span2">
-<span class="field-label">伴奏・楽器</span>
-<div id="instrumentationTagPicker" class="tag-picker"></div>
-<div class="tag-add-row"><input id="newInstrumentationTag" placeholder="新しい伴奏・楽器タグ"><button id="addInstrumentationTagBtn" type="button" class="ghost small">追加</button></div>
-<input id="fInstrumentationTags" type="hidden">
-</div><label class="hidden">伴奏<select id="fAccompaniment"><option value="">未設定</option><option>無伴奏</option><option>ピアノ</option><option>オルガン</option><option>管弦楽</option><option>吹奏楽</option><option>その他</option></select></label>
-<div class="tag-field span2">
-<span class="field-label">言語</span>
-<div id="languageTagPicker" class="tag-picker"></div>
-<div class="tag-add-row"><input id="newLanguageTag" placeholder="新しい言語タグ"><button id="addLanguageTagBtn" type="button" class="ghost small">追加</button></div>
-<input id="fLanguageTags" type="hidden">
-</div><label class="hidden">言語<input id="fLanguage"></label>
-<label>版・エディション<input id="fEdition"></label>
-<label>シリーズ<input id="fSeries"></label>
-<label>ページ数<input id="fPageCount" type="number" min="1"></label>
-<label class="span2">収録曲名
-<textarea id="fScoreContents" rows="10" placeholder="1行に1曲。必要なら「曲名 | 作曲者 | 作詞者 | 編曲者 | ページ」の順で入力"></textarea>
-<small class="muted">例：春に | 木下牧子 | 谷川俊太郎 | | 12</small>
-</label><label class="span2">解説<textarea id="fDescription" rows="6" placeholder="外部データベースにあれば自動取得"></textarea></label><label class="span2">備考<textarea id="fScoreNotes" rows="5" placeholder="手動メモ用"></textarea></label>
-<div class="span2 score-content-tools"><button id="copyPlaylistToScoreBtn" type="button" class="ghost small">既存の収録曲欄から取り込む</button><span id="scoreContentCount" class="muted"></span></div>
-</div></div><label class="span2">作曲者<input id="fComposer"></label><label class="span2">指揮者<input id="fConductor"></label><label class="span2">演奏者 / ソリスト<input id="fPerformers"></label><label class="span2">団体<input id="fEnsemble" placeholder="オーケストラ、吹奏楽団、合唱団など"></label><label>ジャンル<select id="fGenre"><option value="">未設定</option>
-<option>クラシック</option>
-<option>吹奏楽</option>
-<option>ジャズ</option>
-<option>ボサノバ</option>
-<option>合唱</option>
-<option>オペラ・声楽</option>
-<option>現代音楽</option>
-<option>映画・舞台音楽</option>
-<option>サウンドトラック</option>
-<option>ポップス</option>
-<option>ロック</option>
-<option>歌謡曲・演歌</option>
-<option>民族音楽・ワールド</option>
-<option>落語</option>
-<option>教材・資料</option>
-<option>その他</option></select></label><label>収納場所<input id="fLocation" placeholder="例：棚A-2"></label><label>所蔵数<input id="fQuantity" type="number" min="1" value="1"></label><label>入力者<input id="fOperator" readonly></label><label class="span2">収録曲<textarea id="fPlaylist" rows="7" placeholder="1行に1曲"></textarea></label>
-<label class="span2">タグ<input id="fTags" placeholder="「;」区切り"></label><label class="span2">メモ<textarea id="fNotes" rows="4"></textarea></label>
-      
-<input id="fScoreBarcode" type="hidden">
-<input id="fScoreLocation" type="hidden">
-<input id="fScoreQuantity" type="hidden" value="1">
-<input id="fScoreTags" type="hidden">
-<input id="fCoverUrl" type="hidden">
-      <input id="fSourceName" type="hidden">
-      <input id="fSourceUrl" type="hidden">
-<input id="fBooksGenreId" type="hidden">
-<input id="fRawSource" type="hidden"><label class="checkbox span2"><input id="fNeedsReview" type="checkbox">後で詳細確認する</label><div class="actions span2"><button class="primary">保存</button><button id="deleteItemBtn" class="danger-button hidden" type="button">この資料を削除</button><button id="cancelEditBtn" class="ghost" type="button">閉じる</button></div></form></section>
+<label class="span2">出版社名<input id="fPublisher"></label>
+<label>ISBN<input id="fIsbn" inputmode="numeric" placeholder="978..."></label><label>ISMN<input id="fIsmn" placeholder="979-0-..."></label>
+<label class="span2">楽譜種別<select id="fScoreFormat"><option value="">未設定</option><option>合唱譜</option><option>総譜</option><option>パート譜</option><option>ピアノ譜</option><option>ヴォーカルスコア</option><option>器楽譜</option><option>その他</option></select></label>
+<div class="tag-field span2"><span class="field-label">編成</span><div id="voicingTagPicker" class="tag-picker"></div><div class="tag-add-row"><input id="newVoicingTag" placeholder="新しい編成タグ"><button id="addVoicingTagBtn" type="button" class="ghost small">追加</button></div><input id="fVoicingTags" type="hidden"></div>
+<div class="tag-field span2"><span class="field-label">伴奏・楽器</span><div id="instrumentationTagPicker" class="tag-picker"></div><div class="tag-add-row"><input id="newInstrumentationTag" placeholder="新しい伴奏・楽器タグ"><button id="addInstrumentationTagBtn" type="button" class="ghost small">追加</button></div><input id="fInstrumentationTags" type="hidden"></div>
+<div class="tag-field span2"><span class="field-label">言語</span><div id="languageTagPicker" class="tag-picker"></div><div class="tag-add-row"><input id="newLanguageTag" placeholder="新しい言語タグ"><button id="addLanguageTagBtn" type="button" class="ghost small">追加</button></div><input id="fLanguageTags" type="hidden"></div>
+<label class="span2">収録曲名<textarea id="fScoreContents" rows="9" placeholder="1行に1曲。曲名だけでも保存できます"></textarea><small class="muted">詳細入力：曲名 | 作曲者 | 作詞者 | 編曲者 | ページ</small></label><div class="span2 score-content-tools"><span id="scoreContentCount" class="muted"></span></div>
+<label class="span2">解説<textarea id="fDescription" rows="6" placeholder="外部データベースに解説・内容注記があれば自動取得します"></textarea></label><label class="span2">備考<textarea id="fScoreNotes" rows="5" placeholder="手動メモ用"></textarea></label>
+</div></section>
+<input id="fCoverUrl" type="hidden"><input id="fSourceName" type="hidden"><input id="fSourceUrl" type="hidden"><input id="fBooksGenreId" type="hidden"><input id="fRawSource" type="hidden">
+<label class="checkbox"><input id="fNeedsReview" type="checkbox">後で詳細確認する</label><div class="actions"><button class="primary">保存</button><button id="deleteItemBtn" class="danger-button hidden" type="button">この資料を削除</button><button id="cancelEditBtn" class="ghost" type="button">閉じる</button></div>
+</form></section>
 <section class="card"><div class="row-between"><h2>ライブラリ</h2><button id="refreshBtn" class="ghost">更新</button></div><div class="filters"><select id="materialFilter"><option value="">すべての資料</option><option value="media">音源・映像</option><option value="score">楽譜</option></select><input id="searchInput" placeholder="タイトル、作曲者、出版社、ISBN、ISMN、規格品番などを検索"><select id="genreFilter"><option value="">すべてのジャンル</option><option>クラシック</option>
 <option>吹奏楽</option>
 <option>ジャズ</option>
@@ -119,7 +72,7 @@
 </section></main>
 <div id="settingsModal" class="modal hidden"><div class="modal-card"><div class="row-between"><h2>設定</h2><button id="closeSettingsBtn" class="ghost small">閉じる</button></div><div class="settings-list"><button id="changeNameInSettings" class="settings-row"><span>入力者名を変更</span><span>›</span></button><button id="checkUpdateBtn" class="settings-row"><span>アプリを更新</span><span>›</span></button><button id="showHistoryBtn" class="settings-row"><span>アップデート履歴</span><span>›</span></button>
     <button id="diagnoseSearchBtn" class="settings-row"><span>検索サービス診断</span><span>›</span></button>
-<button id="providerSettingsBtn" class="settings-row"><span>検索対象サービス</span><span>›</span></button><div class="settings-row static"><span>現在のバージョン</span><strong id="currentVersionText">v1.10.3</strong></div><button id="logoutBtn" class="settings-row danger-text"><span>ログアウト</span><span>›</span></button></div></div></div>
+<button id="providerSettingsBtn" class="settings-row"><span>検索対象サービス</span><span>›</span></button><div class="settings-row static"><span>現在のバージョン</span><strong id="currentVersionText">v1.11.0</strong></div><button id="logoutBtn" class="settings-row danger-text"><span>ログアウト</span><span>›</span></button></div></div></div>
 <div id="metadataSearchModal" class="modal hidden"><div class="modal-card metadata-search-card">
 <div class="row-between"><h2>品番・タイトルから検索</h2><button id="closeMetadataSearchBtn" class="ghost small">閉じる</button></div>
 <p class="muted">バーコードがない資料を外部データベースから検索します。楽譜ではISBN・ISMN・タイトル・作曲者・出版社も利用できます。</p>
@@ -142,5 +95,5 @@
 </div></div>
 <div id="historyModal" class="modal hidden"><div class="modal-card history-card"><div class="row-between"><h2>アップデート履歴</h2><button id="closeHistoryBtn" class="ghost small">閉じる</button></div><div id="historyList"></div></div></div><div id="toast" class="toast hidden"></div>
 <template id="itemTemplate"><article class="library-item"><img class="item-cover hidden" alt=""><div class="item-content"><div><div class="pills"><span class="media-pill"></span><span class="genre-pill"></span><span class="review-pill hidden">未整理</span></div><h3 class="item-title"></h3><p class="item-artist"></p><p class="item-meta"></p><p class="item-location"></p><p class="item-operator"></p></div></div><button class="edit-item ghost">編集</button></article></template>
-<script src="./config.js?v=1.10.3"></script><script src="./app.js?v=1.10.3"></script>
+<script src="./config.js?v=1.11.0"></script><script src="./app.js?v=1.11.0"></script>
 </body></html>
