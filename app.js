@@ -1,4 +1,4 @@
-const APP_VERSION="1.11.1";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.11.2";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
@@ -154,6 +154,23 @@ $('fScoreContents').addEventListener('input',updateScoreContentCount);
 $('enrichScoreBtn').addEventListener('click',enrichCurrentScore);
 
 function splitTags(v){return String(v||'').split(/[;；\n]+/).map(x=>x.trim()).filter(Boolean)}
+
+function mergeSelectedTags(hiddenId,values){
+  const merged=uniqTags([...(selectedTagsFromHidden(hiddenId)||[]),...(values||[])]);
+  saveSelectedTags(hiddenId,merged);
+}
+function inferLanguageTagsFromText(text){
+  const t=String(text||"");
+  const out=[];
+  const pairs=[
+    ["日本語",/日本語|Japanese/i],["英語",/英語|English/i],["ラテン語",/ラテン語|Latin/i],
+    ["ドイツ語",/ドイツ語|German/i],["フランス語",/フランス語|French/i],
+    ["イタリア語",/イタリア語|Italian/i],["スペイン語",/スペイン語|Spanish/i],
+    ["ロシア語",/ロシア語|Russian/i],["中国語",/中国語|Chinese/i],["韓国語",/韓国語|Korean/i]
+  ];
+  for(const [name,re] of pairs)if(re.test(t))out.push(name);
+  return uniqTags(out);
+}
 function parseScoreContents(text){
   return String(text||'').split(/\n+/).map(x=>x.trim()).filter(Boolean).map((line,i)=>{
     const p=line.split('|').map(x=>x.trim());
@@ -191,7 +208,13 @@ async function enrichCurrentScore(){
   if($('fMaterialType').value!=='score')return;
   const btn=$('enrichScoreBtn');btn.disabled=true;btn.textContent='外部DBを探索中…';
   const search={materialType:'score',isbn:$('fIsbn').value.trim(),ismn:$('fIsmn').value.trim(),title:$('fScoreTitle').value.trim(),artist:$('fScoreComposer').value.trim(),label:$('fPublisher').value.trim(),enrich:true};
-  try{const{data,error}=await sb.functions.invoke('lookup-media',{body:{search,providers:providerSettings}});if(error)throw error;const m=data?.merged||data?.best||data?.candidates?.[0];if(!m){showToast('追加情報は見つかりませんでした');return}let count=0;count+=fillIfEmpty('fScoreTitle',m.title)?1:0;count+=fillIfEmpty('fScoreComposer',m.composer||m.artist)?1:0;count+=fillIfEmpty('fLyricist',m.lyricist)?1:0;count+=fillIfEmpty('fPublisher',m.publisher||m.label)?1:0;count+=fillIfEmpty('fIsbn',m.isbn)?1:0;count+=fillIfEmpty('fIsmn',m.ismn)?1:0;count+=fillIfEmpty('fScoreFormat',m.scoreFormat)?1:0;count+=fillIfEmpty('fDescription',m.description||'')?1:0;if(!$('fScoreContents').value.trim()&&Array.isArray(m.contents)&&m.contents.length){$('fScoreContents').value=scoreContentsToText(m.contents);updateScoreContentCount();count++}if(!$('fCoverUrl').value&&m.coverUrl){$('fCoverUrl').value=m.coverUrl;updateCoverPreview(m.coverUrl,m.source||'外部データベース',m.sourceUrl||'');count++}if(Array.isArray(data?.sources))$('fRawSource').value=JSON.stringify({enrichmentSources:data.sources,candidates:data.candidates||[]});showToast(count?`${count}項目を補完しました`:'既存情報を優先したため変更はありません');}catch(err){console.error(err);showToast('メタデータ補完に失敗しました')}finally{btn.disabled=false;btn.textContent='外部DBから空欄を補完'}
+  try{const{data,error}=await sb.functions.invoke('lookup-media',{body:{search,providers:providerSettings}});if(error)throw error;const m=data?.merged||data?.best||data?.candidates?.[0];if(!m){showToast('追加情報は見つかりませんでした');return}let count=0;count+=fillIfEmpty('fScoreTitle',m.title)?1:0;count+=fillIfEmpty('fScoreComposer',m.composer||m.artist)?1:0;count+=fillIfEmpty('fLyricist',m.lyricist)?1:0;count+=fillIfEmpty('fPublisher',m.publisher||m.label)?1:0;count+=fillIfEmpty('fIsbn',m.isbn)?1:0;count+=fillIfEmpty('fIsmn',m.ismn)?1:0;count+=fillIfEmpty('fScoreFormat',m.scoreFormat)?1:0;count+=fillIfEmpty('fDescription',m.description||'')?1:0;
+    const inferredLang=uniqTags([...(m.languageTags||[]),...inferLanguageTagsFromText([m.description,m.rawSource?JSON.stringify(m.rawSource):''].join(' '))]);
+    if(inferredLang.length){
+      mergeSelectedTags('fLanguageTags',inferredLang);
+      renderTagPicker('language');
+      count++;
+    }if(!$('fScoreContents').value.trim()&&Array.isArray(m.contents)&&m.contents.length){$('fScoreContents').value=scoreContentsToText(m.contents);updateScoreContentCount();count++}if(!$('fCoverUrl').value&&m.coverUrl){$('fCoverUrl').value=m.coverUrl;updateCoverPreview(m.coverUrl,m.source||'外部データベース',m.sourceUrl||'');count++}if(Array.isArray(data?.sources))$('fRawSource').value=JSON.stringify({enrichmentSources:data.sources,candidates:data.candidates||[]});showToast(count?`${count}項目を補完しました`:'既存情報を優先したため変更はありません');}catch(err){console.error(err);showToast('メタデータ補完に失敗しました')}finally{btn.disabled=false;btn.textContent='外部DBから空欄を補完'}
 }
 
 
@@ -500,7 +523,30 @@ function updateCoverPreview(url,sourceName,sourceUrl){
   wrap.classList.remove('hidden');
 }
 
-async function startScanner(){$('scannerPanel').classList.remove('hidden');$('lookupMessage').textContent='カメラを起動しています…';try{scanner=new ZXing.BrowserMultiFormatReader();const constraints={audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}};await scanner.decodeFromConstraints(constraints,'scannerVideo',async result=>{if(result){const code=result.getText();stopScanner();$('barcodeInput').value=code;$('lookupMessage').textContent=`バーコードを読み取りました：${code}`;await lookupBarcode(code)}});$('lookupMessage').textContent='バーコードを画面内に入れてください。'}catch(error){console.error(error);$('lookupMessage').textContent='カメラを起動できませんでした。Safariのカメラ権限を確認してください。'}}function stopScanner(){try{scanner?.reset()}catch{}scanner=null;$('scannerPanel').classList.add('hidden')}
+
+function resultInsideScannerTarget(result){
+  try{
+    const pts=result?.getResultPoints?.()||[];
+    if(!pts.length)return true; // Some formats/readers do not expose points.
+    const video=$('scannerVideo');
+    const vw=video.videoWidth||video.clientWidth;
+    const vh=video.videoHeight||video.clientHeight;
+    if(!vw||!vh)return false;
+
+    const xs=pts.map(p=>typeof p.getX==="function"?p.getX():p.x).filter(Number.isFinite);
+    const ys=pts.map(p=>typeof p.getY==="function"?p.getY():p.y).filter(Number.isFinite);
+    if(!xs.length||!ys.length)return false;
+
+    const cx=(Math.min(...xs)+Math.max(...xs))/2;
+    const cy=(Math.min(...ys)+Math.max(...ys))/2;
+
+    // Must match the visible guide: x 12–88%, y 38–62%.
+    return cx>=vw*.12 && cx<=vw*.88 && cy>=vh*.38 && cy<=vh*.62;
+  }catch{
+    return false;
+  }
+}
+async function startScanner(){$('scannerPanel').classList.remove('hidden');$('lookupMessage').textContent='カメラを起動しています…';try{scanner=new ZXing.BrowserMultiFormatReader();const constraints={audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}};await scanner.decodeFromConstraints(constraints,'scannerVideo',async result=>{if(result&&resultInsideScannerTarget(result)){const code=result.getText();stopScanner();$('barcodeInput').value=code;$('lookupMessage').textContent=`バーコードを読み取りました：${code}`;await lookupBarcode(code)}});$('lookupMessage').textContent='バーコードを画面内に入れてください。'}catch(error){console.error(error);$('lookupMessage').textContent='カメラを起動できませんでした。Safariのカメラ権限を確認してください。'}}function stopScanner(){try{scanner?.reset()}catch{}scanner=null;$('scannerPanel').classList.add('hidden')}
 $('checkUpdateBtn').addEventListener('click',async()=>{closeSettings();await checkForUpdate(true)});$('updateNowBtn').addEventListener('click',forceAppUpdate);async function checkForUpdate(show){try{const r=await fetch(`${VERSION_URL}?t=${Date.now()}`,{cache:'no-store'});if(!r.ok)throw new Error(r.status);const info=await r.json(),latest=info.version;if(compareVersions(latest,APP_VERSION)>0){$('updateBannerTitle').textContent=`新しいバージョン v${latest} があります`;$('updateBannerText').textContent=info.summary||'最新版に更新できます。';$('updateBanner').classList.remove('hidden');if(show)showToast(`v${latest} に更新できます`)}else{$('updateBanner').classList.add('hidden');if(show)showToast('現在のバージョンは最新です')}}catch(e){if(show)showToast('更新情報を確認できませんでした')}}function compareVersions(a,b){const pa=String(a).split('.').map(Number),pb=String(b).split('.').map(Number),l=Math.max(pa.length,pb.length);for(let i=0;i<l;i++){const av=pa[i]||0,bv=pb[i]||0;if(av>bv)return 1;if(av<bv)return-1}return 0}async function forceAppUpdate(){showToast('最新版を読み込んでいます…');try{if('serviceWorker'in navigator){for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister()}if('caches'in window){for(const k of await caches.keys())await caches.delete(k)}}catch{}const u=new URL(location.href);u.searchParams.set('update',Date.now());location.replace(u.toString())}
 $('showHistoryBtn').addEventListener('click',async()=>{closeSettings();await showUpdateHistory()});$('closeHistoryBtn').addEventListener('click',()=>$('historyModal').classList.add('hidden'));async function showUpdateHistory(){const c=$('historyList');c.innerHTML='<p class="muted">読み込んでいます…</p>';$('historyModal').classList.remove('hidden');try{const r=await fetch(`${HISTORY_URL}?t=${Date.now()}`,{cache:'no-store'});if(!r.ok)throw new Error(r.status);const data=await r.json();c.innerHTML='';data.forEach(e=>{const s=document.createElement('section');s.className='history-entry';const h=document.createElement('h3');h.textContent=`v${e.version} — ${e.date}`;s.appendChild(h);if(e.summary){const p=document.createElement('p');p.textContent=e.summary;s.appendChild(p)}if(e.changes?.length){const ul=document.createElement('ul');e.changes.forEach(x=>{const li=document.createElement('li');li.textContent=x;ul.appendChild(li)});s.appendChild(ul)}c.appendChild(s)})}catch{c.innerHTML='<p class="muted">アップデート履歴を読み込めませんでした。</p>'}}function showToast(m){const t=$('toast');t.textContent=m;t.classList.remove('hidden');clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>t.classList.add('hidden'),2500)}
 $('diagnoseSearchBtn').addEventListener('click',async()=>{
