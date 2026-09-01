@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111827">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>文谷家ライブラリ</title>
-  <link rel="stylesheet" href="./styles.css?v=1.10.2">
+  <link rel="stylesheet" href="./styles.css?v=1.10.3">
   <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -99,7 +99,7 @@
       <input id="fSourceName" type="hidden">
       <input id="fSourceUrl" type="hidden">
 <input id="fBooksGenreId" type="hidden">
-<input id="fRawSource" type="hidden"><label class="checkbox span2"><input id="fNeedsReview" type="checkbox">後で詳細確認する</label><div class="actions span2"><button class="primary">保存</button><button id="cancelEditBtn" class="ghost" type="button">閉じる</button></div></form></section>
+<input id="fRawSource" type="hidden"><label class="checkbox span2"><input id="fNeedsReview" type="checkbox">後で詳細確認する</label><div class="actions span2"><button class="primary">保存</button><button id="deleteItemBtn" class="danger-button hidden" type="button">この資料を削除</button><button id="cancelEditBtn" class="ghost" type="button">閉じる</button></div></form></section>
 <section class="card"><div class="row-between"><h2>ライブラリ</h2><button id="refreshBtn" class="ghost">更新</button></div><div class="filters"><select id="materialFilter"><option value="">すべての資料</option><option value="media">音源・映像</option><option value="score">楽譜</option></select><input id="searchInput" placeholder="タイトル、作曲者、出版社、ISBN、ISMN、規格品番などを検索"><select id="genreFilter"><option value="">すべてのジャンル</option><option>クラシック</option>
 <option>吹奏楽</option>
 <option>ジャズ</option>
@@ -119,7 +119,7 @@
 </section></main>
 <div id="settingsModal" class="modal hidden"><div class="modal-card"><div class="row-between"><h2>設定</h2><button id="closeSettingsBtn" class="ghost small">閉じる</button></div><div class="settings-list"><button id="changeNameInSettings" class="settings-row"><span>入力者名を変更</span><span>›</span></button><button id="checkUpdateBtn" class="settings-row"><span>アプリを更新</span><span>›</span></button><button id="showHistoryBtn" class="settings-row"><span>アップデート履歴</span><span>›</span></button>
     <button id="diagnoseSearchBtn" class="settings-row"><span>検索サービス診断</span><span>›</span></button>
-<button id="providerSettingsBtn" class="settings-row"><span>検索対象サービス</span><span>›</span></button><div class="settings-row static"><span>現在のバージョン</span><strong id="currentVersionText">v1.10.2</strong></div><button id="logoutBtn" class="settings-row danger-text"><span>ログアウト</span><span>›</span></button></div></div></div>
+<button id="providerSettingsBtn" class="settings-row"><span>検索対象サービス</span><span>›</span></button><div class="settings-row static"><span>現在のバージョン</span><strong id="currentVersionText">v1.10.3</strong></div><button id="logoutBtn" class="settings-row danger-text"><span>ログアウト</span><span>›</span></button></div></div></div>
 <div id="metadataSearchModal" class="modal hidden"><div class="modal-card metadata-search-card">
 <div class="row-between"><h2>品番・タイトルから検索</h2><button id="closeMetadataSearchBtn" class="ghost small">閉じる</button></div>
 <p class="muted">バーコードがない資料を外部データベースから検索します。楽譜ではISBN・ISMN・タイトル・作曲者・出版社も利用できます。</p>
@@ -142,5 +142,5 @@
 </div></div>
 <div id="historyModal" class="modal hidden"><div class="modal-card history-card"><div class="row-between"><h2>アップデート履歴</h2><button id="closeHistoryBtn" class="ghost small">閉じる</button></div><div id="historyList"></div></div></div><div id="toast" class="toast hidden"></div>
 <template id="itemTemplate"><article class="library-item"><img class="item-cover hidden" alt=""><div class="item-content"><div><div class="pills"><span class="media-pill"></span><span class="genre-pill"></span><span class="review-pill hidden">未整理</span></div><h3 class="item-title"></h3><p class="item-artist"></p><p class="item-meta"></p><p class="item-location"></p><p class="item-operator"></p></div></div><button class="edit-item ghost">編集</button></article></template>
-<script src="./config.js?v=1.10.2"></script><script src="./app.js?v=1.10.2"></script>
+<script src="./config.js?v=1.10.3"></script><script src="./app.js?v=1.10.3"></script>
 </body></html>
