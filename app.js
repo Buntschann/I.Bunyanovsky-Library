@@ -1,4 +1,4 @@
-const APP_VERSION="1.11.2";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.11.3";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
@@ -163,10 +163,16 @@ function inferLanguageTagsFromText(text){
   const t=String(text||"");
   const out=[];
   const pairs=[
-    ["日本語",/日本語|Japanese/i],["英語",/英語|English/i],["ラテン語",/ラテン語|Latin/i],
-    ["ドイツ語",/ドイツ語|German/i],["フランス語",/フランス語|French/i],
-    ["イタリア語",/イタリア語|Italian/i],["スペイン語",/スペイン語|Spanish/i],
-    ["ロシア語",/ロシア語|Russian/i],["中国語",/中国語|Chinese/i],["韓国語",/韓国語|Korean/i]
+    ["日本語",/(?:歌詞|言語|text|lyrics?)\s*[：:]?\s*日本語|日本語(?:歌詞|テキスト)?|Japanese/i],
+    ["英語",/(?:歌詞|言語|text|lyrics?)\s*[：:]?\s*英語|英語(?:歌詞|テキスト)?|English/i],
+    ["ラテン語",/(?:歌詞|言語)\s*[：:]?\s*ラテン語|Latin/i],
+    ["ドイツ語",/(?:歌詞|言語)\s*[：:]?\s*ドイツ語|German/i],
+    ["フランス語",/(?:歌詞|言語)\s*[：:]?\s*フランス語|French/i],
+    ["イタリア語",/(?:歌詞|言語)\s*[：:]?\s*イタリア語|Italian/i],
+    ["スペイン語",/(?:歌詞|言語)\s*[：:]?\s*スペイン語|Spanish/i],
+    ["ロシア語",/(?:歌詞|言語)\s*[：:]?\s*ロシア語|Russian/i],
+    ["中国語",/(?:歌詞|言語)\s*[：:]?\s*中国語|Chinese/i],
+    ["韓国語",/(?:歌詞|言語)\s*[：:]?\s*韓国語|Korean/i]
   ];
   for(const [name,re] of pairs)if(re.test(t))out.push(name);
   return uniqTags(out);
@@ -209,7 +215,14 @@ async function enrichCurrentScore(){
   const btn=$('enrichScoreBtn');btn.disabled=true;btn.textContent='外部DBを探索中…';
   const search={materialType:'score',isbn:$('fIsbn').value.trim(),ismn:$('fIsmn').value.trim(),title:$('fScoreTitle').value.trim(),artist:$('fScoreComposer').value.trim(),label:$('fPublisher').value.trim(),enrich:true};
   try{const{data,error}=await sb.functions.invoke('lookup-media',{body:{search,providers:providerSettings}});if(error)throw error;const m=data?.merged||data?.best||data?.candidates?.[0];if(!m){showToast('追加情報は見つかりませんでした');return}let count=0;count+=fillIfEmpty('fScoreTitle',m.title)?1:0;count+=fillIfEmpty('fScoreComposer',m.composer||m.artist)?1:0;count+=fillIfEmpty('fLyricist',m.lyricist)?1:0;count+=fillIfEmpty('fPublisher',m.publisher||m.label)?1:0;count+=fillIfEmpty('fIsbn',m.isbn)?1:0;count+=fillIfEmpty('fIsmn',m.ismn)?1:0;count+=fillIfEmpty('fScoreFormat',m.scoreFormat)?1:0;count+=fillIfEmpty('fDescription',m.description||'')?1:0;
-    const inferredLang=uniqTags([...(m.languageTags||[]),...inferLanguageTagsFromText([m.description,m.rawSource?JSON.stringify(m.rawSource):''].join(' '))]);
+    const inferredLang=uniqTags([
+      ...(m.languageTags||[]),
+      ...inferLanguageTagsFromText([
+        m.description,m.notes,
+        m.rawSource?JSON.stringify(m.rawSource):'',
+        ...(data?.candidates||[]).map(c=>JSON.stringify(c))
+      ].join(' '))
+    ]);
     if(inferredLang.length){
       mergeSelectedTags('fLanguageTags',inferredLang);
       renderTagPicker('language');
@@ -443,7 +456,7 @@ function openEditor(i){
   $('itemId').value=i.id||'';setEditorMaterialType(material);
   $('fCoverUrl').value=i.cover_url||'';$('fSourceName').value=i.source_name||'';$('fSourceUrl').value=i.source_url||'';$('fBooksGenreId').value=i.books_genre_id||'';$('fRawSource').value=i.raw_source?JSON.stringify(i.raw_source):'';updateCoverPreview(i.cover_url||'',i.source_name||'',i.source_url||'');
   if(material==='score'){
-    $('fScoreTitle').value=i.title||'';$('fScoreComposer').value=i.composer||i.artist||'';$('fComposerKana').value=i.composer_kana||i.artist_kana||'';$('fLyricist').value=i.lyricist||'';$('fLyricistKana').value=i.lyricist_kana||'';$('fPublisher').value=i.publisher||i.label||'';$('fIsbn').value=i.isbn||((/^97[89]/.test(i.barcode||''))?i.barcode:'');$('fIsmn').value=i.ismn||'';$('fScoreFormat').value=i.score_format||'';saveSelectedTags('fVoicingTags',i.voicing_tags||[]);saveSelectedTags('fInstrumentationTags',i.instrumentation_tags||[]);saveSelectedTags('fLanguageTags',i.language_tags||[]);$('fScoreContents').value=scoreContentsToText(i.score_contents||[]);$('fDescription').value=i.description||'';$('fScoreNotes').value=i.id?(i.notes||''):'';updateScoreContentCount();renderAllScoreTagPickers();
+    $('fScoreTitle').value=i.title||'';$('fScoreComposer').value=i.composer||i.artist||'';$('fComposerKana').value=i.composer_kana||i.artist_kana||'';$('fLyricist').value=i.lyricist||'';$('fLyricistKana').value=i.lyricist_kana||'';$('fPublisher').value=i.publisher||i.label||'';$('fIsbn').value=i.isbn||((/^97[89]/.test(i.barcode||''))?i.barcode:'');$('fIsmn').value=i.ismn||'';$('fScoreFormat').value=i.score_format||'';saveSelectedTags('fVoicingTags',i.voicing_tags||[]);saveSelectedTags('fInstrumentationTags',i.instrumentation_tags||[]);saveSelectedTags('fLanguageTags',uniqTags([...(i.language_tags||[]),...inferLanguageTagsFromText([i.description,i.notes,i.raw_source?JSON.stringify(i.raw_source):''].join(' '))]));$('fScoreContents').value=scoreContentsToText(i.score_contents||[]);$('fDescription').value=i.description||'';$('fScoreNotes').value=i.id?(i.notes||''):'';updateScoreContentCount();renderAllScoreTagPickers();
   }else{
     $('fBarcode').value=i.barcode||'';$('fMediaType').value=i.media_type||'CD';$('fTitle').value=i.title||'';$('fArtist').value=i.artist||'';$('fTitleKana').value=i.title_kana||'';$('fArtistKana').value=i.artist_kana||'';$('fYear').value=i.release_year||'';$('fReleaseDateText').value=i.release_date_text||'';$('fLabel').value=i.label||'';$('fCatalogNo').value=i.catalog_no||'';$('fDiscCount').value=i.disc_count||1;$('fAlbumType').value=i.album_type||'';$('fComposer').value=i.composer||'';$('fConductor').value=i.conductor||'';$('fPerformers').value=i.performers||'';$('fEnsemble').value=i.ensemble||'';$('fGenre').value=i.genre||'';$('fLocation').value=i.location||'';$('fQuantity').value=i.quantity||1;$('fOperator').value=operatorName;$('fPlaylist').value=(i.playlist||[]).join('\n');$('fTags').value=(i.tags||[]).join('; ');$('fNotes').value=i.notes||'';
   }
