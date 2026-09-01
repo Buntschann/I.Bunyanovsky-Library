@@ -5,22 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111827">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>I.Bunyanovsky Library</title>
-  <link rel="stylesheet" href="./styles.css?v=1.7.2">
+  <title>文谷家ライブラリ</title>
+  <link rel="stylesheet" href="./styles.css?v=1.8.0">
   <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<header class="topbar"><div><h1>I.Bunyanovsky Library</h1><p>CD・DVDライブラリ</p></div><button id="settingsBtn" class="ghost inverse hidden">設定</button></header>
+<header class="topbar"><div><h1>文谷家ライブラリ</h1><p>音源・映像・楽譜ライブラリ</p></div><button id="settingsBtn" class="ghost inverse hidden">設定</button></header>
 <main class="container">
 <section id="updateBanner" class="card update-banner hidden"><div><strong id="updateBannerTitle">新しいバージョンがあります</strong><p id="updateBannerText" class="muted"></p></div><button id="updateNowBtn" class="primary">今すぐ更新</button></section>
 <section id="setupNotice" class="card warning hidden"><h2>初期設定が必要です</h2><p><code>config.js</code> にSupabaseの情報を設定してください。</p></section>
-<section id="gateView" class="card"><h2>I.Bunyanovsky Library</h2><p class="muted">共通パスワードを入力してください。</p><form id="gateForm" class="stack"><label>共通パスワード<input id="sharedPassword" type="password" autocomplete="current-password" required></label><label class="checkbox"><input id="rememberSession" type="checkbox" checked>この端末で認証状態を保持する</label><button class="primary">ライブラリを開く</button></form><p id="gateMessage" class="message"></p></section>
+<section id="gateView" class="card"><h2>文谷家ライブラリ</h2><p class="muted">共通パスワードを入力してください。</p><form id="gateForm" class="stack"><label>共通パスワード<input id="sharedPassword" type="password" autocomplete="current-password" required></label><label class="checkbox"><input id="rememberSession" type="checkbox" checked>この端末で認証状態を保持する</label><button class="primary">ライブラリを開く</button></form><p id="gateMessage" class="message"></p></section>
 <section id="nameView" class="card hidden"><h2>入力者名の設定</h2><p class="muted">この端末で登録する人の名前を入力してください。あとから変更できます。</p><form id="nameForm" class="stack"><label>入力者名<input id="operatorNameInput" maxlength="50" placeholder="例：真" required></label><button class="primary">設定する</button></form></section>
 <section id="appView" class="hidden">
 <section class="operatorbar card"><div><span class="muted">入力者</span><strong id="operatorNameDisplay"></strong></div><button id="changeOperatorBtn" class="ghost">変更</button></section>
-<section class="stats-grid"><div class="stat"><span id="countAll">0</span><small>総所蔵数</small></div><div class="stat"><span id="countCD">0</span><small>CD</small></div><div class="stat"><span id="countVideo">0</span><small>DVD / BD</small></div><div class="stat"><span id="countReview">0</span><small>未整理</small></div></section>
-<section class="card"><div class="row-between"><h2>新規登録</h2><button id="refreshLibraryBtn" class="ghost small">一覧を更新</button></div><div class="actions"><button id="scanBtn" class="primary">バーコードを読み取る</button><button id="metadataSearchBtn" class="secondary">品番・タイトルから検索</button><button id="manualBtn" class="secondary">手動で登録</button></div><div id="scannerPanel" class="hidden"><video id="scannerVideo" playsinline muted></video><p class="muted">バーコードを画面内に入れてください。</p><button id="stopScanBtn" class="ghost">読み取りを終了</button></div><label class="mt">JAN / EANコード<div class="inline"><input id="barcodeInput" inputmode="numeric" placeholder="例：4988000000000"><button id="lookupBtn" class="secondary" type="button">検索</button></div></label><p id="lookupMessage" class="message"></p>
+<section class="stats-grid"><div class="stat"><span id="countAll">0</span><small>総所蔵数</small></div><div class="stat"><span id="countCD">0</span><small>CD</small></div><div class="stat"><span id="countVideo">0</span><small>DVD / BD</small></div><div class="stat"><span id="countScore">0</span><small>楽譜</small></div><div class="stat"><span id="countReview">0</span><small>未整理</small></div></section>
+<section class="card"><div class="row-between"><h2>新規登録</h2><button id="refreshLibraryBtn" class="ghost small">一覧を更新</button></div><label class="mt">登録する資料<select id="registrationMaterialType"><option value="media">音源・映像</option><option value="score">楽譜</option></select></label><div class="actions"><button id="scanBtn" class="primary">バーコードを読み取る</button><button id="metadataSearchBtn" class="secondary">品番・タイトルから検索</button><button id="manualBtn" class="secondary">手動で登録</button></div><div id="scannerPanel" class="hidden"><video id="scannerVideo" playsinline muted></video><p class="muted">バーコードを画面内に入れてください。</p><button id="stopScanBtn" class="ghost">読み取りを終了</button></div><label class="mt"><span id="barcodeLabelText">JAN / EANコード</span><div class="inline"><input id="barcodeInput" inputmode="numeric" placeholder="例：4988000000000"><button id="lookupBtn" class="secondary" type="button">検索</button></div></label><p id="lookupMessage" class="message"></p>
     <div id="explorerStatus" class="explorer-status hidden">
       <span class="explorer-icon">⌕</span>
       <div><strong>Archive Explorer</strong><p id="explorerText">外部データベースを探索しています…</p></div>
@@ -33,11 +33,26 @@
           <strong id="coverSourceTitle">外部データベースから取得</strong>
           <p id="coverSourceText" class="muted"></p>
         </div>
-      </div><label>バーコード<input id="fBarcode"></label><label>媒体<select id="fMediaType"><option>CD</option><option>DVD</option><option>Blu-ray</option><option>CD-R</option><option>DVD-R</option><option value="Other">その他</option></select></label><label class="span2">タイトル<input id="fTitle" required></label><label class="span2">アーティスト / 主演者<input id="fArtist"></label>
+      </div><label>バーコード<input id="fBarcode"></label><label>媒体・資料形態<select id="fMediaType"><option>CD</option><option>DVD</option><option>Blu-ray</option><option>CD-R</option><option>DVD-R</option><option>楽譜</option><option value="Other">その他</option></select></label><input id="fMaterialType" type="hidden" value="media"><label class="span2">タイトル<input id="fTitle" required></label><label class="span2">アーティスト / 著者<input id="fArtist"></label>
 <label>タイトル（カナ）<input id="fTitleKana"></label>
 <label>アーティスト（カナ）<input id="fArtistKana"></label><label>発売年<input id="fYear" inputmode="numeric"></label>
 <label>発売日（原表記）<input id="fReleaseDateText"></label><label>レーベル<input id="fLabel"></label><label>規格品番<input id="fCatalogNo"></label><label>枚数<input id="fDiscCount" type="number" min="1" value="1"></label>
-<label>商品区分<input id="fAlbumType" placeholder="アルバム、シングルなど"></label><label class="span2">作曲者<input id="fComposer"></label><label class="span2">指揮者<input id="fConductor"></label><label class="span2">演奏者 / ソリスト<input id="fPerformers"></label><label class="span2">団体<input id="fEnsemble" placeholder="オーケストラ、吹奏楽団、合唱団など"></label><label>ジャンル<select id="fGenre"><option value="">未設定</option>
+<label>商品区分<input id="fAlbumType" placeholder="アルバム、シングルなど"></label><div id="scoreFields" class="span2 score-fields hidden">
+<div class="section-title">楽譜情報</div>
+<div class="form-grid inner-grid">
+<label>ISBN<input id="fIsbn" inputmode="numeric" placeholder="978..."></label>
+<label>ISMN<input id="fIsmn" placeholder="979-0-..."></label>
+<label class="span2">出版社<input id="fPublisher"></label>
+<label>作詞者<input id="fLyricist"></label>
+<label>編曲者<input id="fArranger"></label>
+<label>楽譜種別<select id="fScoreFormat"><option value="">未設定</option><option>合唱譜</option><option>総譜</option><option>パート譜</option><option>ピアノ譜</option><option>ヴォーカルスコア</option><option>器楽譜</option><option>その他</option></select></label>
+<label>編成<input id="fVoicing" placeholder="例：混声4部、女声3部、SATB"></label>
+<label>伴奏<select id="fAccompaniment"><option value="">未設定</option><option>無伴奏</option><option>ピアノ</option><option>オルガン</option><option>管弦楽</option><option>吹奏楽</option><option>その他</option></select></label>
+<label>言語<input id="fLanguage" placeholder="例：日本語、ラテン語、英語"></label>
+<label>版・エディション<input id="fEdition"></label>
+<label>シリーズ<input id="fSeries"></label>
+<label>ページ数<input id="fPageCount" type="number" min="1"></label>
+</div></div><label class="span2">作曲者<input id="fComposer"></label><label class="span2">指揮者<input id="fConductor"></label><label class="span2">演奏者 / ソリスト<input id="fPerformers"></label><label class="span2">団体<input id="fEnsemble" placeholder="オーケストラ、吹奏楽団、合唱団など"></label><label>ジャンル<select id="fGenre"><option value="">未設定</option>
 <option>クラシック</option>
 <option>吹奏楽</option>
 <option>ジャズ</option>
@@ -60,7 +75,7 @@
       <input id="fSourceUrl" type="hidden">
 <input id="fBooksGenreId" type="hidden">
 <input id="fRawSource" type="hidden"><label class="checkbox span2"><input id="fNeedsReview" type="checkbox">後で詳細確認する</label><div class="actions span2"><button class="primary">保存</button><button id="cancelEditBtn" class="ghost" type="button">閉じる</button></div></form></section>
-<section class="card"><div class="row-between"><h2>ライブラリ</h2><button id="refreshBtn" class="ghost">更新</button></div><div class="filters"><input id="searchInput" placeholder="タイトル、作曲者、演奏者、団体、規格品番などを検索"><select id="genreFilter"><option value="">すべてのジャンル</option><option>クラシック</option>
+<section class="card"><div class="row-between"><h2>ライブラリ</h2><button id="refreshBtn" class="ghost">更新</button></div><div class="filters"><select id="materialFilter"><option value="">すべての資料</option><option value="media">音源・映像</option><option value="score">楽譜</option></select><input id="searchInput" placeholder="タイトル、作曲者、出版社、ISBN、ISMN、規格品番などを検索"><select id="genreFilter"><option value="">すべてのジャンル</option><option>クラシック</option>
 <option>吹奏楽</option>
 <option>ジャズ</option>
 <option>ボサノバ</option>
@@ -79,16 +94,16 @@
 </section></main>
 <div id="settingsModal" class="modal hidden"><div class="modal-card"><div class="row-between"><h2>設定</h2><button id="closeSettingsBtn" class="ghost small">閉じる</button></div><div class="settings-list"><button id="changeNameInSettings" class="settings-row"><span>入力者名を変更</span><span>›</span></button><button id="checkUpdateBtn" class="settings-row"><span>アプリを更新</span><span>›</span></button><button id="showHistoryBtn" class="settings-row"><span>アップデート履歴</span><span>›</span></button>
     <button id="diagnoseSearchBtn" class="settings-row"><span>検索サービス診断</span><span>›</span></button>
-<button id="providerSettingsBtn" class="settings-row"><span>検索対象サービス</span><span>›</span></button><div class="settings-row static"><span>現在のバージョン</span><strong id="currentVersionText">v1.7.2</strong></div><button id="logoutBtn" class="settings-row danger-text"><span>ログアウト</span><span>›</span></button></div></div></div>
+<button id="providerSettingsBtn" class="settings-row"><span>検索対象サービス</span><span>›</span></button><div class="settings-row static"><span>現在のバージョン</span><strong id="currentVersionText">v1.8.0</strong></div><button id="logoutBtn" class="settings-row danger-text"><span>ログアウト</span><span>›</span></button></div></div></div>
 <div id="metadataSearchModal" class="modal hidden"><div class="modal-card metadata-search-card">
 <div class="row-between"><h2>品番・タイトルから検索</h2><button id="closeMetadataSearchBtn" class="ghost small">閉じる</button></div>
 <p class="muted">バーコードがない資料を、規格品番・タイトル・アーティスト・レーベルなどから外部データベースで検索します。</p>
-<form id="metadataSearchForm" class="form-grid metadata-search-form">
-  <label>規格品番<input id="msCatalogNo" placeholder="例：UCCG-45001"></label>
+<form id="metadataSearchForm" class="form-grid metadata-search-form"><label class="span2">資料種別<select id="msMaterialType"><option value="media">音源・映像</option><option value="score">楽譜</option></select></label>
+  <label>規格品番<input id="msCatalogNo" placeholder="例：UCCG-45001"></label><label class="score-search-field hidden">ISBN<input id="msIsbn" placeholder="978..."></label><label class="score-search-field hidden">ISMN<input id="msIsmn" placeholder="979-0-..."></label>
   <label>発売年<input id="msYear" inputmode="numeric" placeholder="例：1998"></label>
   <label class="span2">タイトル<input id="msTitle" placeholder="曲名ではなくCD・アルバムのタイトル"></label>
-  <label class="span2">アーティスト / 作曲者<input id="msArtist" placeholder="例：Miles Davis、Mozart"></label>
-  <label class="span2">レーベル / 発売元<input id="msLabel" placeholder="例：Deutsche Grammophon"></label>
+  <label class="span2">アーティスト / 作曲者 / 著者<input id="msArtist" placeholder="例：Miles Davis、Mozart"></label>
+  <label class="span2">レーベル / 出版社<input id="msLabel" placeholder="例：Deutsche Grammophon"></label>
   <div class="actions span2"><button class="primary" type="submit">外部データベースを検索</button><button id="clearMetadataSearchBtn" class="ghost" type="button">入力をクリア</button></div>
 </form>
 <div id="metadataSearchStatus" class="message"></div>
@@ -102,5 +117,5 @@
 </div></div>
 <div id="historyModal" class="modal hidden"><div class="modal-card history-card"><div class="row-between"><h2>アップデート履歴</h2><button id="closeHistoryBtn" class="ghost small">閉じる</button></div><div id="historyList"></div></div></div><div id="toast" class="toast hidden"></div>
 <template id="itemTemplate"><article class="library-item"><img class="item-cover hidden" alt=""><div class="item-content"><div><div class="pills"><span class="media-pill"></span><span class="genre-pill"></span><span class="review-pill hidden">未整理</span></div><h3 class="item-title"></h3><p class="item-artist"></p><p class="item-meta"></p><p class="item-location"></p><p class="item-operator"></p></div></div><button class="edit-item ghost">編集</button></article></template>
-<script src="./config.js?v=1.7.2"></script><script src="./app.js?v=1.7.2"></script>
+<script src="./config.js?v=1.8.0"></script><script src="./app.js?v=1.8.0"></script>
 </body></html>

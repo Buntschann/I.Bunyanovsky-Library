@@ -1,4 +1,4 @@
-const APP_VERSION="1.7.2";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.8.0";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 const PROVIDER_DEFAULTS={
   rakuten:true,
@@ -30,9 +30,59 @@ $('gateForm').addEventListener('submit',async e=>{e.preventDefault();$('gateMess
 function enterAfterAuth(){$('gateView').classList.add('hidden');$('settingsBtn').classList.remove('hidden');if(!operatorName){$('nameView').classList.remove('hidden');$('appView').classList.add('hidden')}else showApp()}
 $('nameForm').addEventListener('submit',e=>{e.preventDefault();setOperator($('operatorNameInput').value.trim())});$('changeOperatorBtn').addEventListener('click',promptOperator);$('changeNameInSettings').addEventListener('click',()=>{closeSettings();promptOperator()});function promptOperator(){const name=prompt('入力者名を入力してください。',operatorName);if(name!==null&&name.trim())setOperator(name.trim())}function setOperator(name){operatorName=name;localStorage.setItem('ib_operator_name',name);$('nameView').classList.add('hidden');showApp()}function showApp(){$('appView').classList.remove('hidden');$('operatorNameDisplay').textContent=operatorName;$('fOperator').value=operatorName;loadLibrary()}
 $('settingsBtn').addEventListener('click',()=>$('settingsModal').classList.remove('hidden'));$('closeSettingsBtn').addEventListener('click',closeSettings);function closeSettings(){$('settingsModal').classList.add('hidden')}$('logoutBtn').addEventListener('click',async()=>{await sb.auth.signOut();closeSettings();$('appView').classList.add('hidden');$('settingsBtn').classList.add('hidden');$('gateView').classList.remove('hidden')});
-$('manualBtn').addEventListener('click',()=>openEditor({}));$('metadataSearchBtn').addEventListener('click',openMetadataSearch);$('closeMetadataSearchBtn').addEventListener('click',closeMetadataSearch);$('clearMetadataSearchBtn').addEventListener('click',()=>{$('metadataSearchForm').reset();$('metadataSearchResults').innerHTML='';$('metadataSearchStatus').textContent=''});$('metadataSearchForm').addEventListener('submit',searchMetadata);$('refreshBtn').addEventListener('click',loadLibrary);$('refreshLibraryBtn').addEventListener('click',loadLibrary);$('searchInput').addEventListener('input',renderLibrary);$('genreFilter').addEventListener('change',renderLibrary);$('reviewFilter').addEventListener('change',renderLibrary);$('cancelEditBtn').addEventListener('click',()=>$('editorCard').classList.add('hidden'));$('lookupBtn').addEventListener('click',()=>lookupBarcode($('barcodeInput').value.trim()));$('scanBtn').addEventListener('click',startScanner);$('stopScanBtn').addEventListener('click',stopScanner);
-async function loadLibrary(){const{data,error}=await sb.from('library_items').select('*').order('created_at',{ascending:false});if(error){alert('ライブラリを取得できませんでした。');return}library=data||[];updateStats();renderLibrary()}function qty(a){return a.reduce((s,x)=>s+(Number(x.quantity)||1),0)}function updateStats(){$('countAll').textContent=qty(library);$('countCD').textContent=qty(library.filter(x=>['CD','CD-R'].includes(x.media_type)));$('countVideo').textContent=qty(library.filter(x=>['DVD','DVD-R','Blu-ray'].includes(x.media_type)));$('countReview').textContent=library.filter(x=>x.needs_review).length}
-function renderLibrary(){const q=$('searchInput').value.trim().toLowerCase(),g=$('genreFilter').value,r=$('reviewFilter').value,list=$('libraryList');list.innerHTML='';const items=library.filter(x=>{const hay=[x.title,x.artist,x.composer,x.conductor,x.performers,x.ensemble,x.label,x.catalog_no,x.barcode,x.location,x.operator_name,...(x.tags||[])].filter(Boolean).join(' ').toLowerCase();return(!q||hay.includes(q))&&(!g||x.genre===g)&&(!r||String(x.needs_review)===r)});if(!items.length){list.innerHTML='<p class="muted">該当する資料はありません。</p>';return}items.forEach(item=>{const n=$('itemTemplate').content.cloneNode(true);n.querySelector('.media-pill').textContent=item.media_type||'CD';n.querySelector('.genre-pill').textContent=item.genre||'ジャンル未設定';n.querySelector('.review-pill').classList.toggle('hidden',!item.needs_review);n.querySelector('.item-title').textContent=item.title;n.querySelector('.item-artist').textContent=item.artist||'';n.querySelector('.item-meta').textContent=[item.composer,item.conductor,item.ensemble,item.release_year,item.catalog_no].filter(Boolean).join(' / ');n.querySelector('.item-location').textContent=[item.location?`収納：${item.location}`:'',item.quantity>1?`所蔵数：${item.quantity}`:''].filter(Boolean).join(' / ');n.querySelector('.item-operator').textContent=`入力者：${item.operator_name||'-'}`;const cover=n.querySelector('.item-cover');if(item.cover_url){cover.src=item.cover_url;cover.classList.remove('hidden')}n.querySelector('.edit-item').addEventListener('click',()=>openEditor(item));list.appendChild(n)})}
+$('manualBtn').addEventListener('click',()=>openEditor({material_type:$('registrationMaterialType').value,media_type:$('registrationMaterialType').value==='score'?'楽譜':'CD'}));$('metadataSearchBtn').addEventListener('click',openMetadataSearch);$('closeMetadataSearchBtn').addEventListener('click',closeMetadataSearch);$('clearMetadataSearchBtn').addEventListener('click',()=>{$('metadataSearchForm').reset();$('metadataSearchResults').innerHTML='';$('metadataSearchStatus').textContent=''});$('metadataSearchForm').addEventListener('submit',searchMetadata);$('refreshBtn').addEventListener('click',loadLibrary);$('refreshLibraryBtn').addEventListener('click',loadLibrary);$('searchInput').addEventListener('input',renderLibrary);$('genreFilter').addEventListener('change',renderLibrary);$('materialFilter').addEventListener('change',renderLibrary);$('reviewFilter').addEventListener('change',renderLibrary);$('cancelEditBtn').addEventListener('click',()=>$('editorCard').classList.add('hidden'));$('lookupBtn').addEventListener('click',()=>lookupBarcode($('barcodeInput').value.trim()));$('scanBtn').addEventListener('click',startScanner);$('stopScanBtn').addEventListener('click',stopScanner);
+$('registrationMaterialType').addEventListener('change',updateRegistrationMode);
+$('msMaterialType').addEventListener('change',updateMetadataSearchMode);
+$('fMediaType').addEventListener('change',()=>{if($('fMediaType').value==='楽譜')setEditorMaterialType('score');});
+function updateRegistrationMode(){
+  const score=$('registrationMaterialType').value==='score';
+  $('barcodeLabelText').textContent=score?'ISBN / JAN / EANコード':'JAN / EANコード';
+  $('barcodeInput').placeholder=score?'例：9784117188076':'例：4988000000000';
+}
+function updateMetadataSearchMode(){
+  const score=$('msMaterialType').value==='score';
+  document.querySelectorAll('.score-search-field').forEach(x=>x.classList.toggle('hidden',!score));
+  $('msCatalogNo').placeholder=score?'例：出版社品番':'例：UCCG-45001';
+}
+function setEditorMaterialType(type){
+  const score=type==='score';
+  $('fMaterialType').value=score?'score':'media';
+  $('scoreFields').classList.toggle('hidden',!score);
+  if(score && $('fMediaType').value!=='楽譜')$('fMediaType').value='楽譜';
+  if(!score && $('fMediaType').value==='楽譜')$('fMediaType').value='CD';
+}
+updateRegistrationMode();updateMetadataSearchMode();
+
+async function loadLibrary(){const{data,error}=await sb.from('library_items').select('*').order('created_at',{ascending:false});if(error){alert('ライブラリを取得できませんでした。');return}library=data||[];updateStats();renderLibrary()}function qty(a){return a.reduce((s,x)=>s+(Number(x.quantity)||1),0)}function updateStats(){$('countAll').textContent=qty(library);$('countCD').textContent=qty(library.filter(x=>x.material_type!=='score'&&['CD','CD-R'].includes(x.media_type)));$('countVideo').textContent=qty(library.filter(x=>x.material_type!=='score'&&['DVD','DVD-R','Blu-ray'].includes(x.media_type)));$('countScore').textContent=qty(library.filter(x=>x.material_type==='score'||x.media_type==='楽譜'));$('countReview').textContent=library.filter(x=>x.needs_review).length}
+function renderLibrary(){
+  const q=$('searchInput').value.trim().toLowerCase(),g=$('genreFilter').value,r=$('reviewFilter').value,m=$('materialFilter').value,list=$('libraryList');
+  list.innerHTML='';
+  const items=library.filter(x=>{
+    const hay=[x.search_text,x.title,x.title_kana,x.artist,x.artist_kana,x.composer,x.lyricist,x.arranger,x.conductor,x.performers,x.ensemble,x.label,x.publisher,x.catalog_no,x.barcode,x.isbn,x.ismn,x.edition,x.series,x.score_format,x.voicing,x.accompaniment,x.language,x.location,x.operator_name,...(x.playlist||[]),...(x.tags||[])].filter(Boolean).join(' ').toLowerCase();
+    const mt=x.material_type||((x.media_type==='楽譜')?'score':'media');
+    return(!q||hay.includes(q))&&(!g||x.genre===g)&&(!m||mt===m)&&(!r||String(x.needs_review)===r)
+  });
+  if(!items.length){list.innerHTML='<p class="muted">該当する資料はありません。</p>';return}
+  items.forEach(item=>{
+    const n=$('itemTemplate').content.cloneNode(true);
+    const article=n.querySelector('.library-item');
+    const isScore=item.material_type==='score'||item.media_type==='楽譜';
+    if(isScore)article.classList.add('score-item');
+    n.querySelector('.media-pill').textContent=isScore?'楽譜':(item.media_type||'CD');
+    n.querySelector('.genre-pill').textContent=item.genre||'ジャンル未設定';
+    n.querySelector('.review-pill').classList.toggle('hidden',!item.needs_review);
+    n.querySelector('.item-title').textContent=item.title;
+    n.querySelector('.item-artist').textContent=isScore?[item.composer,item.lyricist?`作詞：${item.lyricist}`:''].filter(Boolean).join(' / '):(item.artist||'');
+    n.querySelector('.item-meta').textContent=isScore
+      ? [item.publisher,item.voicing,item.score_format,item.isbn?`ISBN ${item.isbn}`:'',item.ismn?`ISMN ${item.ismn}`:'',item.catalog_no].filter(Boolean).join(' / ')
+      : [item.composer,item.conductor,item.ensemble,item.release_year,item.catalog_no].filter(Boolean).join(' / ');
+    n.querySelector('.item-location').textContent=[item.location?`収納：${item.location}`:'',item.quantity>1?`所蔵数：${item.quantity}`:''].filter(Boolean).join(' / ');
+    n.querySelector('.item-operator').textContent=`入力者：${item.operator_name||'-'}`;
+    const cover=n.querySelector('.item-cover');if(item.cover_url){cover.src=item.cover_url;cover.classList.remove('hidden')}
+    else if(isScore){cover.classList.remove('hidden');cover.alt='楽譜';cover.removeAttribute('src')}
+    n.querySelector('.edit-item').addEventListener('click',()=>openEditor(item));list.appendChild(n)
+  })
+}
 
 
 function openMetadataSearch(){
@@ -45,14 +95,17 @@ function closeMetadataSearch(){$('metadataSearchModal').classList.add('hidden')}
 async function searchMetadata(e){
   e.preventDefault();
   const search={
+    materialType:$('msMaterialType').value,
     catalogNo:$('msCatalogNo').value.trim(),
+    isbn:$('msIsbn').value.trim(),
+    ismn:$('msIsmn').value.trim(),
     title:$('msTitle').value.trim(),
     artist:$('msArtist').value.trim(),
     label:$('msLabel').value.trim(),
     year:$('msYear').value.trim()
   };
-  if(!search.catalogNo&&!search.title&&!search.artist&&!search.label){
-    $('metadataSearchStatus').textContent='規格品番・タイトル・アーティスト・レーベルのいずれかを入力してください。';return;
+  if(!search.catalogNo&&!search.isbn&&!search.ismn&&!search.title&&!search.artist&&!search.label){
+    $('metadataSearchStatus').textContent='規格品番・ISBN・ISMN・タイトル・作曲者・出版社など、いずれかを入力してください。';return;
   }
   $('metadataSearchResults').innerHTML='';
   $('metadataSearchStatus').textContent='外部データベースを横断検索しています…';
@@ -116,7 +169,7 @@ async function lookupBarcode(raw){
 
   try{
     const {data,error}=await sb.functions.invoke('lookup-media',{
-      body:{barcode,providers:providerSettings}
+      body:{barcode,materialType:$('registrationMaterialType').value,providers:providerSettings}
     });
 
     if(error)throw error;
@@ -124,7 +177,7 @@ async function lookupBarcode(raw){
     $('explorerStatus').classList.add('hidden');
 
     if(!data?.found || !data.best){
-      openEditor({barcode,needs_review:true});
+      openEditor({barcode,material_type:$('registrationMaterialType').value,media_type:$('registrationMaterialType').value==='score'?'楽譜':'CD',isbn:$('registrationMaterialType').value==='score'&&/^97[89]/.test(barcode)?barcode:'',needs_review:true});
       $('lookupMessage').textContent=
         '外部データベースに一致する資料が見つかりませんでした。手動登録画面を開きました。';
       showSource(formatAttempts(data?.attempts||[]));
@@ -145,7 +198,7 @@ async function lookupBarcode(raw){
   }catch(error){
     console.error('lookup-media error',error);
     $('explorerStatus').classList.add('hidden');
-    openEditor({barcode,needs_review:true});
+    openEditor({barcode,material_type:$('registrationMaterialType').value,media_type:$('registrationMaterialType').value==='score'?'楽譜':'CD',isbn:$('registrationMaterialType').value==='score'&&/^97[89]/.test(barcode)?barcode:'',needs_review:true});
     $('lookupMessage').textContent=
       '検索サーバーに接続できませんでした。手動登録画面を開きました。';
     showSource('検索サービス：接続エラー');
@@ -175,6 +228,7 @@ function showSource(text){
 function mapServerCandidate(r,barcode){
   return{
     barcode,
+    material_type:r.materialType||((r.mediaType==='楽譜')?'score':'media'),
     media_type:r.mediaType||'CD',
     title:r.title||'',
     title_kana:r.titleKana||'',
@@ -185,6 +239,7 @@ function mapServerCandidate(r,barcode){
     books_genre_id:r.booksGenreId||'',
     raw_source:r.rawSource||null,
     artist:r.artist||'',
+    isbn:r.isbn||'',ismn:r.ismn||'',lyricist:r.lyricist||'',arranger:r.arranger||'',publisher:r.publisher||'',edition:r.edition||'',series:r.series||'',score_format:r.scoreFormat||'',voicing:r.voicing||'',accompaniment:r.accompaniment||'',language:r.language||'',page_count:r.pageCount||'',
     release_year:r.year||'',
     label:r.label||'',
     catalog_no:r.catalogNo||'',
@@ -198,18 +253,68 @@ function mapServerCandidate(r,barcode){
   };
 }
 function guessMediaType(r){const f=(r.media||[]).map(m=>(m.format||'').toLowerCase()).join(' ');if(f.includes('blu-ray'))return'Blu-ray';if(f.includes('dvd'))return'DVD';return'CD'}
-function openEditor(i){$('editorCard').classList.remove('hidden');$('itemId').value=i.id||'';$('fBarcode').value=i.barcode||'';$('fMediaType').value=i.media_type||'CD';$('fTitle').value=i.title||'';$('fArtist').value=i.artist||'';$('fTitleKana').value=i.title_kana||'';$('fArtistKana').value=i.artist_kana||'';$('fYear').value=i.release_year||'';$('fReleaseDateText').value=i.release_date_text||'';$('fLabel').value=i.label||'';$('fCatalogNo').value=i.catalog_no||'';$('fDiscCount').value=i.disc_count||1;$('fAlbumType').value=i.album_type||'';$('fComposer').value=i.composer||'';$('fConductor').value=i.conductor||'';$('fPerformers').value=i.performers||'';$('fEnsemble').value=i.ensemble||'';$('fGenre').value=i.genre||'';$('fLocation').value=i.location||'';$('fQuantity').value=i.quantity||1;$('fOperator').value=operatorName;$('fPlaylist').value=(i.playlist||[]).join('\n');$('fTags').value=(i.tags||[]).join('; ');$('fNotes').value=i.notes||'';
-  $('fCoverUrl').value=i.cover_url||'';
-  $('fSourceName').value=i.source_name||'';
-  $('fSourceUrl').value=i.source_url||'';$('fBooksGenreId').value=i.books_genre_id||'';$('fRawSource').value=i.raw_source?JSON.stringify(i.raw_source):'';
-  updateCoverPreview(i.cover_url||'',i.source_name||'',i.source_url||'');
-  $('fNeedsReview').checked=!!i.needs_review;$('editorTitle').textContent=i.id?'登録内容を編集':'登録内容を確認';const dup=i.barcode&&library.some(x=>x.barcode===i.barcode&&x.id!==i.id);$('duplicateBadge').classList.toggle('hidden',!dup);$('editorCard').scrollIntoView({behavior:'smooth',block:'start'})}
+function openEditor(i){
+  $('editorCard').classList.remove('hidden');
+  const material=i.material_type||((i.media_type==='楽譜')?'score':'media');
+  $('itemId').value=i.id||'';$('fBarcode').value=i.barcode||'';$('fMaterialType').value=material;$('fMediaType').value=i.media_type||(material==='score'?'楽譜':'CD');
+  $('fTitle').value=i.title||'';$('fArtist').value=i.artist||'';$('fTitleKana').value=i.title_kana||'';$('fArtistKana').value=i.artist_kana||'';
+  $('fYear').value=i.release_year||'';$('fReleaseDateText').value=i.release_date_text||'';$('fLabel').value=i.label||'';$('fCatalogNo').value=i.catalog_no||'';
+  $('fDiscCount').value=i.disc_count||1;$('fAlbumType').value=i.album_type||'';$('fComposer').value=i.composer||'';$('fConductor').value=i.conductor||'';
+  $('fPerformers').value=i.performers||'';$('fEnsemble').value=i.ensemble||'';$('fGenre').value=i.genre||'';$('fLocation').value=i.location||'';
+  $('fQuantity').value=i.quantity||1;$('fOperator').value=operatorName;$('fPlaylist').value=(i.playlist||[]).join('\n');$('fTags').value=(i.tags||[]).join('; ');$('fNotes').value=i.notes||'';
+  $('fIsbn').value=i.isbn||'';$('fIsmn').value=i.ismn||'';$('fLyricist').value=i.lyricist||'';$('fArranger').value=i.arranger||'';$('fPublisher').value=i.publisher||'';
+  $('fEdition').value=i.edition||'';$('fSeries').value=i.series||'';$('fScoreFormat').value=i.score_format||'';$('fVoicing').value=i.voicing||'';
+  $('fAccompaniment').value=i.accompaniment||'';$('fLanguage').value=i.language||'';$('fPageCount').value=i.page_count||'';
+  $('fCoverUrl').value=i.cover_url||'';$('fSourceName').value=i.source_name||'';$('fSourceUrl').value=i.source_url||'';
+  $('fBooksGenreId').value=i.books_genre_id||'';$('fRawSource').value=i.raw_source?JSON.stringify(i.raw_source):'';
+  setEditorMaterialType(material);updateCoverPreview(i.cover_url||'',i.source_name||'',i.source_url||'');
+  $('fNeedsReview').checked=!!i.needs_review;$('editorTitle').textContent=i.id?'登録内容を編集':'登録内容を確認';
+  const dup=i.barcode&&library.some(x=>x.barcode===i.barcode&&x.id!==i.id);$('duplicateBadge').classList.toggle('hidden',!dup);
+  $('editorCard').scrollIntoView({behavior:'smooth',block:'start'})
+}
 $('itemForm').addEventListener('submit',async e=>{e.preventDefault();const p=formPayload(),id=$('itemId').value||null;let error;if(id){p.updated_at=new Date().toISOString();({error}=await sb.from('library_items').update(p).eq('id',id))}else({error}=await sb.from('library_items').insert(p));if(error){alert('保存できませんでした。');return}$('editorCard').classList.add('hidden');$('barcodeInput').value='';$('lookupMessage').textContent='保存しました。';await loadLibrary()});
-function formPayload(){return{barcode:$('fBarcode').value.trim()||null,media_type:$('fMediaType').value,title:$('fTitle').value.trim(),title_kana:$('fTitleKana').value.trim()||null,artist:$('fArtist').value.trim()||null,artist_kana:$('fArtistKana').value.trim()||null,release_year:Number($('fYear').value)||null,release_date_text:$('fReleaseDateText').value.trim()||null,label:$('fLabel').value.trim()||null,catalog_no:$('fCatalogNo').value.trim()||null,disc_count:Number($('fDiscCount').value)||1,album_type:$('fAlbumType').value.trim()||null,composer:$('fComposer').value.trim()||null,conductor:$('fConductor').value.trim()||null,performers:$('fPerformers').value.trim()||null,ensemble:$('fEnsemble').value.trim()||null,genre:$('fGenre').value||null,location:$('fLocation').value.trim()||null,quantity:Number($('fQuantity').value)||1,playlist:$('fPlaylist').value.split(/\n+/).map(x=>x.trim()).filter(Boolean),tags:$('fTags').value.split(';').map(x=>x.trim()).filter(Boolean),notes:$('fNotes').value.trim()||null,needs_review:$('fNeedsReview').checked,
-    cover_url:$('fCoverUrl').value||null,
-    source_name:$('fSourceName').value||null,
-    source_url:$('fSourceUrl').value||null,books_genre_id:$('fBooksGenreId').value||null,raw_source:(()=>{try{return $('fRawSource').value?JSON.parse($('fRawSource').value):null}catch{return null}})(),
-    operator_name:operatorName}}
+function formPayload(){return{
+  barcode:$('fBarcode').value.trim()||null,
+  material_type:$('fMaterialType').value||'media',
+  media_type:$('fMediaType').value,
+  title:$('fTitle').value.trim(),
+  title_kana:$('fTitleKana').value.trim()||null,
+  artist:$('fArtist').value.trim()||null,
+  artist_kana:$('fArtistKana').value.trim()||null,
+  release_year:Number($('fYear').value)||null,
+  release_date_text:$('fReleaseDateText').value.trim()||null,
+  label:$('fLabel').value.trim()||null,
+  catalog_no:$('fCatalogNo').value.trim()||null,
+  disc_count:Number($('fDiscCount').value)||1,
+  album_type:$('fAlbumType').value.trim()||null,
+  composer:$('fComposer').value.trim()||null,
+  lyricist:$('fLyricist').value.trim()||null,
+  arranger:$('fArranger').value.trim()||null,
+  conductor:$('fConductor').value.trim()||null,
+  performers:$('fPerformers').value.trim()||null,
+  ensemble:$('fEnsemble').value.trim()||null,
+  isbn:$('fIsbn').value.replace(/[\s-]/g,'')||null,
+  ismn:$('fIsmn').value.trim()||null,
+  publisher:$('fPublisher').value.trim()||null,
+  edition:$('fEdition').value.trim()||null,
+  series:$('fSeries').value.trim()||null,
+  score_format:$('fScoreFormat').value||null,
+  voicing:$('fVoicing').value.trim()||null,
+  accompaniment:$('fAccompaniment').value||null,
+  language:$('fLanguage').value.trim()||null,
+  page_count:Number($('fPageCount').value)||null,
+  genre:$('fGenre').value||null,
+  location:$('fLocation').value.trim()||null,
+  quantity:Number($('fQuantity').value)||1,
+  playlist:$('fPlaylist').value.split(/\n+/).map(x=>x.trim()).filter(Boolean),
+  tags:$('fTags').value.split(';').map(x=>x.trim()).filter(Boolean),
+  notes:$('fNotes').value.trim()||null,
+  needs_review:$('fNeedsReview').checked,
+  cover_url:$('fCoverUrl').value||null,source_name:$('fSourceName').value||null,source_url:$('fSourceUrl').value||null,
+  books_genre_id:$('fBooksGenreId').value||null,
+  raw_source:(()=>{try{return $('fRawSource').value?JSON.parse($('fRawSource').value):null}catch{return null}})(),
+  operator_name:operatorName
+}}
 
 function updateCoverPreview(url,sourceName,sourceUrl){
   const wrap=$('coverPreviewWrap');
