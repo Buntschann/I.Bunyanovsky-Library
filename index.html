@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111827">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>文谷家ライブラリ</title>
-  <link rel="stylesheet" href="./styles.css?v=1.10.1">
+  <link rel="stylesheet" href="./styles.css?v=1.10.2">
   <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -52,8 +52,18 @@
       <div class="tag-add-row"><input id="newVoicingTag" placeholder="新しい編成タグ"><button id="addVoicingTagBtn" type="button" class="ghost small">追加</button></div>
       <input id="fVoicingTags" type="hidden">
     </div>
-<label>伴奏・楽器（タグ）<input id="fInstrumentationTags" placeholder="例：ピアノ; フルート; 無伴奏"></label><label class="hidden">伴奏<select id="fAccompaniment"><option value="">未設定</option><option>無伴奏</option><option>ピアノ</option><option>オルガン</option><option>管弦楽</option><option>吹奏楽</option><option>その他</option></select></label>
-<label>言語（タグ）<input id="fLanguageTags" placeholder="例：日本語; ラテン語; 英語"></label><label class="hidden">言語<input id="fLanguage"></label>
+<div class="tag-field span2">
+<span class="field-label">伴奏・楽器</span>
+<div id="instrumentationTagPicker" class="tag-picker"></div>
+<div class="tag-add-row"><input id="newInstrumentationTag" placeholder="新しい伴奏・楽器タグ"><button id="addInstrumentationTagBtn" type="button" class="ghost small">追加</button></div>
+<input id="fInstrumentationTags" type="hidden">
+</div><label class="hidden">伴奏<select id="fAccompaniment"><option value="">未設定</option><option>無伴奏</option><option>ピアノ</option><option>オルガン</option><option>管弦楽</option><option>吹奏楽</option><option>その他</option></select></label>
+<div class="tag-field span2">
+<span class="field-label">言語</span>
+<div id="languageTagPicker" class="tag-picker"></div>
+<div class="tag-add-row"><input id="newLanguageTag" placeholder="新しい言語タグ"><button id="addLanguageTagBtn" type="button" class="ghost small">追加</button></div>
+<input id="fLanguageTags" type="hidden">
+</div><label class="hidden">言語<input id="fLanguage"></label>
 <label>版・エディション<input id="fEdition"></label>
 <label>シリーズ<input id="fSeries"></label>
 <label>ページ数<input id="fPageCount" type="number" min="1"></label>
@@ -61,7 +71,7 @@
 <textarea id="fScoreContents" rows="10" placeholder="1行に1曲。必要なら「曲名 | 作曲者 | 作詞者 | 編曲者 | ページ」の順で入力"></textarea>
 <small class="muted">例：春に | 木下牧子 | 谷川俊太郎 | | 12</small>
 </label><label class="span2">解説<textarea id="fDescription" rows="6" placeholder="外部データベースにあれば自動取得"></textarea></label><label class="span2">備考<textarea id="fScoreNotes" rows="5" placeholder="手動メモ用"></textarea></label>
-<div class="span2 score-content-tools><button id="copyPlaylistToScoreBtn" type="button" class="ghost small">既存の収録曲欄から取り込む</button><span id="scoreContentCount" class="muted"></span></div>
+<div class="span2 score-content-tools"><button id="copyPlaylistToScoreBtn" type="button" class="ghost small">既存の収録曲欄から取り込む</button><span id="scoreContentCount" class="muted"></span></div>
 </div></div><label class="span2">作曲者<input id="fComposer"></label><label class="span2">指揮者<input id="fConductor"></label><label class="span2">演奏者 / ソリスト<input id="fPerformers"></label><label class="span2">団体<input id="fEnsemble" placeholder="オーケストラ、吹奏楽団、合唱団など"></label><label>ジャンル<select id="fGenre"><option value="">未設定</option>
 <option>クラシック</option>
 <option>吹奏楽</option>
@@ -80,7 +90,12 @@
 <option>教材・資料</option>
 <option>その他</option></select></label><label>収納場所<input id="fLocation" placeholder="例：棚A-2"></label><label>所蔵数<input id="fQuantity" type="number" min="1" value="1"></label><label>入力者<input id="fOperator" readonly></label><label class="span2">収録曲<textarea id="fPlaylist" rows="7" placeholder="1行に1曲"></textarea></label>
 <label class="span2">タグ<input id="fTags" placeholder="「;」区切り"></label><label class="span2">メモ<textarea id="fNotes" rows="4"></textarea></label>
-      <input id="fCoverUrl" type="hidden">
+      
+<input id="fScoreBarcode" type="hidden">
+<input id="fScoreLocation" type="hidden">
+<input id="fScoreQuantity" type="hidden" value="1">
+<input id="fScoreTags" type="hidden">
+<input id="fCoverUrl" type="hidden">
       <input id="fSourceName" type="hidden">
       <input id="fSourceUrl" type="hidden">
 <input id="fBooksGenreId" type="hidden">
@@ -104,7 +119,7 @@
 </section></main>
 <div id="settingsModal" class="modal hidden"><div class="modal-card"><div class="row-between"><h2>設定</h2><button id="closeSettingsBtn" class="ghost small">閉じる</button></div><div class="settings-list"><button id="changeNameInSettings" class="settings-row"><span>入力者名を変更</span><span>›</span></button><button id="checkUpdateBtn" class="settings-row"><span>アプリを更新</span><span>›</span></button><button id="showHistoryBtn" class="settings-row"><span>アップデート履歴</span><span>›</span></button>
     <button id="diagnoseSearchBtn" class="settings-row"><span>検索サービス診断</span><span>›</span></button>
-<button id="providerSettingsBtn" class="settings-row"><span>検索対象サービス</span><span>›</span></button><div class="settings-row static"><span>現在のバージョン</span><strong id="currentVersionText">v1.10.1</strong></div><button id="logoutBtn" class="settings-row danger-text"><span>ログアウト</span><span>›</span></button></div></div></div>
+<button id="providerSettingsBtn" class="settings-row"><span>検索対象サービス</span><span>›</span></button><div class="settings-row static"><span>現在のバージョン</span><strong id="currentVersionText">v1.10.2</strong></div><button id="logoutBtn" class="settings-row danger-text"><span>ログアウト</span><span>›</span></button></div></div></div>
 <div id="metadataSearchModal" class="modal hidden"><div class="modal-card metadata-search-card">
 <div class="row-between"><h2>品番・タイトルから検索</h2><button id="closeMetadataSearchBtn" class="ghost small">閉じる</button></div>
 <p class="muted">バーコードがない資料を外部データベースから検索します。楽譜ではISBN・ISMN・タイトル・作曲者・出版社も利用できます。</p>
@@ -127,5 +142,5 @@
 </div></div>
 <div id="historyModal" class="modal hidden"><div class="modal-card history-card"><div class="row-between"><h2>アップデート履歴</h2><button id="closeHistoryBtn" class="ghost small">閉じる</button></div><div id="historyList"></div></div></div><div id="toast" class="toast hidden"></div>
 <template id="itemTemplate"><article class="library-item"><img class="item-cover hidden" alt=""><div class="item-content"><div><div class="pills"><span class="media-pill"></span><span class="genre-pill"></span><span class="review-pill hidden">未整理</span></div><h3 class="item-title"></h3><p class="item-artist"></p><p class="item-meta"></p><p class="item-location"></p><p class="item-operator"></p></div></div><button class="edit-item ghost">編集</button></article></template>
-<script src="./config.js?v=1.10.1"></script><script src="./app.js?v=1.10.1"></script>
+<script src="./config.js?v=1.10.2"></script><script src="./app.js?v=1.10.2"></script>
 </body></html>
