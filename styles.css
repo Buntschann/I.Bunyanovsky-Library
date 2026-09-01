@@ -47,3 +47,8 @@
 .section-title{font-weight:700;margin-bottom:10px}
 .inner-grid{margin-top:0}
 .library-item.score-item .item-cover{object-fit:contain;background:#f9fafb}
+
+/* v1.9.0 */
+.editor-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.score-content-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.enrich-report{white-space:pre-line;font-size:.9rem}

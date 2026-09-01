@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111827">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>文谷家ライブラリ</title>
-  <link rel="stylesheet" href="./styles.css?v=1.8.0">
+  <link rel="stylesheet" href="./styles.css?v=1.9.0">
   <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -26,7 +26,7 @@
       <div><strong>Archive Explorer</strong><p id="explorerText">外部データベースを探索しています…</p></div>
     </div>
     <p id="sourceMessage" class="source-message hidden"></p></section>
-<section id="editorCard" class="card hidden"><div class="row-between"><h2 id="editorTitle">登録内容</h2><span id="duplicateBadge" class="badge danger hidden">同一バーコードあり</span></div><form id="itemForm" class="form-grid"><input id="itemId" type="hidden">
+<section id="editorCard" class="card hidden"><div class="row-between"><h2 id="editorTitle">登録内容</h2><div class="editor-head-actions"><button id="enrichScoreBtn" type="button" class="secondary small hidden">外部DBから空欄を補完</button><span id="duplicateBadge" class="badge danger hidden">同一バーコードあり</span></div></div><form id="itemForm" class="form-grid"><input id="itemId" type="hidden">
       <div id="coverPreviewWrap" class="cover-preview-wrap span2 hidden">
         <img id="coverPreview" alt="ジャケット画像">
         <div>
@@ -52,6 +52,11 @@
 <label>版・エディション<input id="fEdition"></label>
 <label>シリーズ<input id="fSeries"></label>
 <label>ページ数<input id="fPageCount" type="number" min="1"></label>
+<label class="span2">収録曲・曲集内容
+<textarea id="fScoreContents" rows="10" placeholder="1行に1曲。必要なら「曲名 | 作曲者 | 作詞者 | 編曲者 | ページ」の順で入力"></textarea>
+<small class="muted">例：春に | 木下牧子 | 谷川俊太郎 | | 12</small>
+</label>
+<div class="span2 score-content-tools"><button id="copyPlaylistToScoreBtn" type="button" class="ghost small">既存の収録曲欄から取り込む</button><span id="scoreContentCount" class="muted"></span></div>
 </div></div><label class="span2">作曲者<input id="fComposer"></label><label class="span2">指揮者<input id="fConductor"></label><label class="span2">演奏者 / ソリスト<input id="fPerformers"></label><label class="span2">団体<input id="fEnsemble" placeholder="オーケストラ、吹奏楽団、合唱団など"></label><label>ジャンル<select id="fGenre"><option value="">未設定</option>
 <option>クラシック</option>
 <option>吹奏楽</option>
@@ -94,10 +99,10 @@
 </section></main>
 <div id="settingsModal" class="modal hidden"><div class="modal-card"><div class="row-between"><h2>設定</h2><button id="closeSettingsBtn" class="ghost small">閉じる</button></div><div class="settings-list"><button id="changeNameInSettings" class="settings-row"><span>入力者名を変更</span><span>›</span></button><button id="checkUpdateBtn" class="settings-row"><span>アプリを更新</span><span>›</span></button><button id="showHistoryBtn" class="settings-row"><span>アップデート履歴</span><span>›</span></button>
     <button id="diagnoseSearchBtn" class="settings-row"><span>検索サービス診断</span><span>›</span></button>
-<button id="providerSettingsBtn" class="settings-row"><span>検索対象サービス</span><span>›</span></button><div class="settings-row static"><span>現在のバージョン</span><strong id="currentVersionText">v1.8.0</strong></div><button id="logoutBtn" class="settings-row danger-text"><span>ログアウト</span><span>›</span></button></div></div></div>
+<button id="providerSettingsBtn" class="settings-row"><span>検索対象サービス</span><span>›</span></button><div class="settings-row static"><span>現在のバージョン</span><strong id="currentVersionText">v1.9.0</strong></div><button id="logoutBtn" class="settings-row danger-text"><span>ログアウト</span><span>›</span></button></div></div></div>
 <div id="metadataSearchModal" class="modal hidden"><div class="modal-card metadata-search-card">
 <div class="row-between"><h2>品番・タイトルから検索</h2><button id="closeMetadataSearchBtn" class="ghost small">閉じる</button></div>
-<p class="muted">バーコードがない資料を、規格品番・タイトル・アーティスト・レーベルなどから外部データベースで検索します。</p>
+<p class="muted">バーコードがない資料を外部データベースから検索します。楽譜ではISBN・ISMN・タイトル・作曲者・出版社も利用できます。</p>
 <form id="metadataSearchForm" class="form-grid metadata-search-form"><label class="span2">資料種別<select id="msMaterialType"><option value="media">音源・映像</option><option value="score">楽譜</option></select></label>
   <label>規格品番<input id="msCatalogNo" placeholder="例：UCCG-45001"></label><label class="score-search-field hidden">ISBN<input id="msIsbn" placeholder="978..."></label><label class="score-search-field hidden">ISMN<input id="msIsmn" placeholder="979-0-..."></label>
   <label>発売年<input id="msYear" inputmode="numeric" placeholder="例：1998"></label>
@@ -117,5 +122,5 @@
 </div></div>
 <div id="historyModal" class="modal hidden"><div class="modal-card history-card"><div class="row-between"><h2>アップデート履歴</h2><button id="closeHistoryBtn" class="ghost small">閉じる</button></div><div id="historyList"></div></div></div><div id="toast" class="toast hidden"></div>
 <template id="itemTemplate"><article class="library-item"><img class="item-cover hidden" alt=""><div class="item-content"><div><div class="pills"><span class="media-pill"></span><span class="genre-pill"></span><span class="review-pill hidden">未整理</span></div><h3 class="item-title"></h3><p class="item-artist"></p><p class="item-meta"></p><p class="item-location"></p><p class="item-operator"></p></div></div><button class="edit-item ghost">編集</button></article></template>
-<script src="./config.js?v=1.8.0"></script><script src="./app.js?v=1.8.0"></script>
+<script src="./config.js?v=1.9.0"></script><script src="./app.js?v=1.9.0"></script>
 </body></html>
