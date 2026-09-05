@@ -1,4 +1,4 @@
-const APP_VERSION="1.13.7";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.13.8";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
@@ -556,9 +556,13 @@ function applyPanamusicaCandidate(c){
     count++;
   }
 
-  if(c.description && !$('fDescription').value.trim()){
-    $('fDescription').value=c.description;
-    count++;
+  if(c.description){
+    const current=$('fDescription').value.trim();
+    const generic=!current || /外部データベース|内容注記|演奏手段|歌詞[:：]/.test(current);
+    if(generic){
+      $('fDescription').value=c.description;
+      count++;
+    }
   }
 
   // Preserve previous raw data and attach selected Panamusica data.
