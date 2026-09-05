@@ -1,4 +1,4 @@
-const APP_VERSION="1.13.5";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.13.6";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
@@ -439,6 +439,49 @@ function clearPanamusicaCandidates(){
   if(panel && $('fMaterialType')?.value==='score')panel.classList.remove('hidden');
 }
 
+
+function normalizePersonForTitle(s){
+  return String(s||"").normalize("NFKC").replace(/[\s　・･]/g,"").trim();
+}
+function cleanPanamusicaTitle(title,composer){
+  let t=String(title||"").trim();
+  const c=String(composer||"").trim();
+  if(!t||!c)return t;
+
+  const compactComposer=normalizePersonForTitle(c);
+
+  // Remove a composer name only when it appears as a standalone prefix/suffix.
+  // Compare after removing spaces from the person name, but preserve the work title.
+  const parts=t.split(/\s+/).filter(Boolean);
+  if(parts.length>=2){
+    // suffix: "混声合唱組曲「終わりのない歌」 上田 真樹"
+    for(let n=Math.min(4,parts.length-1);n>=1;n--){
+      const tail=parts.slice(-n).join("");
+      if(normalizePersonForTitle(tail)===compactComposer){
+        t=parts.slice(0,-n).join(" ").trim();
+        break;
+      }
+    }
+  }
+
+  // no-space suffix/prefix
+  const noSpace=t.replace(/[\s　]/g,"");
+  const cNoSpace=c.replace(/[\s　]/g,"");
+  if(noSpace.endsWith(cNoSpace) && noSpace.length>cNoSpace.length+1){
+    // Find the last visible occurrence and remove it conservatively.
+    const variants=[c,c.replace(/[\s　]/g,"")];
+    for(const v of variants){
+      if(v && t.endsWith(v)){
+        t=t.slice(0,-v.length).trim();
+        break;
+      }
+    }
+  }
+  if(t.startsWith(c) && t.length>c.length+1){
+    t=t.slice(c.length).replace(/^[：:・\-\—–／/、，,\s]+/,"").trim();
+  }
+  return t;
+}
 function panaCandidateLabel(c,index){
   const raw=c?.rawSource||{};
   const title=raw.panamusicaTitle||c.title||`候補${index+1}`;
@@ -480,7 +523,7 @@ function applyPanamusicaCandidate(c){
 
   // Once the user explicitly selects a Panamusica candidate,
   // the score title and publisher follow the selected product page.
-  const panaTitle=c?.rawSource?.panamusicaTitle||c.title||'';
+  const panaTitle=cleanPanamusicaTitle(c?.rawSource?.panamusicaTitle||c.title||'',c.composer||c.artist||'');
   if(panaTitle && $('fScoreTitle').value.trim()!==panaTitle){
     $('fScoreTitle').value=panaTitle;
     count++;
