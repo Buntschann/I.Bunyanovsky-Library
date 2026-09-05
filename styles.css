@@ -133,3 +133,25 @@
   flex-direction:column;
   gap:8px;
 }
+
+
+/* v1.14.2 楽譜ジャンル・カスタムタグ削除 */
+.tag-chip-wrap{
+  display:inline-flex;
+  align-items:center;
+  gap:3px;
+}
+.tag-delete-btn{
+  width:26px;
+  height:26px;
+  padding:0;
+  border-radius:999px;
+  border:1px solid #d1d5db;
+  background:#fff;
+  color:#991b1b;
+  font-size:18px;
+  line-height:1;
+  font-weight:700;
+  cursor:pointer;
+}
+.tag-delete-btn:active{transform:translateY(1px)}

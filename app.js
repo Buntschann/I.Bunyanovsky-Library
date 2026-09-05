@@ -1,4 +1,4 @@
-const APP_VERSION="1.14.1";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.14.2";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
@@ -98,6 +98,64 @@ function selectedTagsFromHidden(id){
 function saveSelectedTags(id,values){
   $(id).value=JSON.stringify(uniqTags(values));
 }
+
+function scoreTagConfig(kind){
+  return {
+    voicing:{hidden:"fVoicingTags",column:"voicing_tags",label:"編成"},
+    instrumentation:{hidden:"fInstrumentationTags",column:"instrumentation_tags",label:"伴奏・楽器"},
+    language:{hidden:"fLanguageTags",column:"language_tags",label:"言語"}
+  }[kind]||null;
+}
+function isDefaultScoreTag(kind,tag){
+  return (SCORE_TAG_DEFAULTS[kind]||[])
+    .some(x=>String(x).toLowerCase()===String(tag).toLowerCase());
+}
+async function deleteCustomScoreTag(kind,tag){
+  const cfg=scoreTagConfig(kind);
+  if(!cfg||!tag||isDefaultScoreTag(kind,tag))return;
+
+  const key=String(tag).toLowerCase();
+  const usedItems=(library||[]).filter(item=>{
+    const mt=item.material_type||((item.media_type==='楽譜')?'score':'media');
+    if(mt!=='score')return false;
+    return (item[cfg.column]||[]).some(x=>String(x).toLowerCase()===key);
+  });
+
+  const message=usedItems.length
+    ? `「${tag}」を${cfg.label}タグから削除します。\n\n登録済みの楽譜 ${usedItems.length}件からもこのタグを削除します。\nこの操作を続けますか？`
+    : `「${tag}」を${cfg.label}タグの候補から削除しますか？`;
+
+  if(!confirm(message))return;
+
+  try{
+    for(const item of usedItems){
+      const next=(item[cfg.column]||[])
+        .filter(x=>String(x).toLowerCase()!==key);
+      const patch={};
+      patch[cfg.column]=next;
+      const {error}=await sb.from('library_items').update(patch).eq('id',item.id);
+      if(error)throw error;
+      item[cfg.column]=next;
+    }
+
+    // Also remove it from the item currently being edited.
+    const current=selectedTagsFromHidden(cfg.hidden)
+      .filter(x=>String(x).toLowerCase()!==key);
+    saveSelectedTags(cfg.hidden,current);
+
+    scoreTagOptions[kind]=(scoreTagOptions[kind]||[])
+      .filter(x=>String(x).toLowerCase()!==key);
+
+    collectUsedScoreTags();
+    renderTagPicker(kind);
+    renderLibrary();
+    showToast(`「${tag}」を削除しました`);
+  }catch(err){
+    console.error(err);
+    alert('タグを削除できませんでした。通信状態を確認して、もう一度お試しください。');
+  }
+}
+
 function collectUsedScoreTags(){
   const v=[],ins=[],lang=[];
   for(const item of library||[]){
@@ -118,22 +176,57 @@ function renderTagPicker(kind){
     instrumentation:{picker:"instrumentationTagPicker",hidden:"fInstrumentationTags"},
     language:{picker:"languageTagPicker",hidden:"fLanguageTags"}
   };
-  const cfg=map[kind],box=$(cfg.picker);
+  const cfg=map[kind],box=cfg?$(cfg.picker):null;
   if(!cfg||!box||!$(cfg.hidden))return;
-  const selected=new Set(selectedTagsFromHidden(cfg.hidden).map(x=>String(x).toLowerCase()));
+
+  const selectedValues=selectedTagsFromHidden(cfg.hidden);
+  const selected=new Set(selectedValues.map(x=>String(x).toLowerCase()));
   box.innerHTML="";
-  const options=uniqTags([...(scoreTagOptions[kind]||[]),...selectedTagsFromHidden(cfg.hidden)]);
-  if(!options.length){box.innerHTML='<span class="tag-empty">候補はまだありません</span>';return}
+
+  const options=uniqTags([...(scoreTagOptions[kind]||[]),...selectedValues]);
+  if(!options.length){
+    box.innerHTML='<span class="tag-empty">候補はまだありません</span>';
+    return;
+  }
+
   options.forEach(tag=>{
+    const wrap=document.createElement("span");
+    wrap.className="tag-chip-wrap";
+
     const b=document.createElement("button");
-    b.type="button";b.className="tag-chip"+(selected.has(tag.toLowerCase())?" selected":"");b.textContent=tag;
+    b.type="button";
+    b.className="tag-chip"+(selected.has(tag.toLowerCase())?" selected":"");
+    b.textContent=tag;
     b.addEventListener("click",()=>{
       const current=selectedTagsFromHidden(cfg.hidden);
       const exists=current.some(x=>String(x).toLowerCase()===tag.toLowerCase());
-      saveSelectedTags(cfg.hidden,exists?current.filter(x=>String(x).toLowerCase()!==tag.toLowerCase()):[...current,tag]);
+      saveSelectedTags(
+        cfg.hidden,
+        exists
+          ? current.filter(x=>String(x).toLowerCase()!==tag.toLowerCase())
+          : [...current,tag]
+      );
       renderTagPicker(kind);
     });
-    box.appendChild(b);
+    wrap.appendChild(b);
+
+    // Built-in standard tags are protected. Only added/custom tags get a delete button.
+    if(!isDefaultScoreTag(kind,tag)){
+      const del=document.createElement("button");
+      del.type="button";
+      del.className="tag-delete-btn";
+      del.setAttribute("aria-label",`${tag}を削除`);
+      del.title="このタグを削除";
+      del.textContent="×";
+      del.addEventListener("click",async ev=>{
+        ev.preventDefault();
+        ev.stopPropagation();
+        await deleteCustomScoreTag(kind,tag);
+      });
+      wrap.appendChild(del);
+    }
+
+    box.appendChild(wrap);
   });
 }
 function renderAllScoreTagPickers(){
@@ -142,12 +235,18 @@ function renderAllScoreTagPickers(){
 }
 function addCustomScoreTag(kind,inputId){
   const map={voicing:"fVoicingTags",instrumentation:"fInstrumentationTags",language:"fLanguageTags"};
-  const input=$(inputId);const tag=input.value.trim();if(!tag)return;
+  const input=$(inputId);
+  const tag=input?.value?.trim()||"";
+  if(!tag)return;
+
   const current=selectedTagsFromHidden(map[kind]);
   saveSelectedTags(map[kind],[...current,tag]);
   input.value="";
+
   collectUsedScoreTags();
-  if(!scoreTagOptions[kind].some(x=>x.toLowerCase()===tag.toLowerCase()))scoreTagOptions[kind].push(tag);
+  if(!scoreTagOptions[kind].some(x=>x.toLowerCase()===tag.toLowerCase())){
+    scoreTagOptions[kind].push(tag);
+  }
   renderTagPicker(kind);
 }
 
@@ -844,7 +943,7 @@ function openEditor(i){
   $('itemId').value=i.id||'';setEditorMaterialType(material);
   $('fCoverUrl').value=i.cover_url||'';$('fSourceName').value=i.source_name||'';$('fSourceUrl').value=i.source_url||'';$('fBooksGenreId').value=i.books_genre_id||'';$('fRawSource').value=i.raw_source?JSON.stringify(i.raw_source):'';updateCoverPreview(i.cover_url||'',i.source_name||'',i.source_url||'');
   if(material==='score'){
-    $('fScoreTitle').value=i.title||'';$('fScoreComposer').value=i.composer||i.artist||'';$('fComposerKana').value=i.composer_kana||i.artist_kana||'';$('fLyricist').value=i.lyricist||'';$('fLyricistKana').value=i.lyricist_kana||'';$('fPublisher').value=i.publisher||i.label||'';$('fIsbn').value=i.isbn||((/^97[89]/.test(i.barcode||''))?i.barcode:'');$('fIsmn').value=i.ismn||'';$('fScoreFormat').value=i.score_format||'';saveSelectedTags('fVoicingTags',i.voicing_tags||[]);saveSelectedTags('fInstrumentationTags',i.instrumentation_tags||[]);saveSelectedTags('fLanguageTags',uniqTags([...(i.language_tags||[]),...inferLanguageTagsFromText([i.description,i.notes,i.raw_source?JSON.stringify(i.raw_source):''].join(' '))]));$('fScoreContents').value=scoreContentsToText(i.score_contents||[]);$('fDescription').value=i.description||'';$('fScoreNotes').value=i.id?(i.notes||''):'';updateScoreContentCount();renderAllScoreTagPickers();
+    $('fScoreTitle').value=i.title||'';$('fScoreComposer').value=i.composer||i.artist||'';$('fComposerKana').value=i.composer_kana||i.artist_kana||'';$('fLyricist').value=i.lyricist||'';$('fLyricistKana').value=i.lyricist_kana||'';$('fPublisher').value=i.publisher||i.label||'';$('fIsbn').value=i.isbn||((/^97[89]/.test(i.barcode||''))?i.barcode:'');$('fIsmn').value=i.ismn||'';$('fScoreFormat').value=i.score_format||'';$('fScoreGenre').value=i.genre||'';saveSelectedTags('fVoicingTags',i.voicing_tags||[]);saveSelectedTags('fInstrumentationTags',i.instrumentation_tags||[]);saveSelectedTags('fLanguageTags',uniqTags([...(i.language_tags||[]),...inferLanguageTagsFromText([i.description,i.notes,i.raw_source?JSON.stringify(i.raw_source):''].join(' '))]));$('fScoreContents').value=scoreContentsToText(i.score_contents||[]);$('fDescription').value=i.description||'';$('fScoreNotes').value=i.id?(i.notes||''):'';updateScoreContentCount();renderAllScoreTagPickers();
   }else{
     $('fBarcode').value=i.barcode||'';$('fMediaType').value=i.media_type||'CD';$('fTitle').value=i.title||'';$('fArtist').value=i.artist||'';$('fTitleKana').value=i.title_kana||'';$('fArtistKana').value=i.artist_kana||'';$('fYear').value=i.release_year||'';$('fReleaseDateText').value=i.release_date_text||'';$('fLabel').value=i.label||'';$('fCatalogNo').value=i.catalog_no||'';$('fDiscCount').value=i.disc_count||1;$('fAlbumType').value=i.album_type||'';$('fComposer').value=i.composer||'';$('fConductor').value=i.conductor||'';$('fPerformers').value=i.performers||'';$('fEnsemble').value=i.ensemble||'';$('fGenre').value=i.genre||'';$('fLocation').value=i.location||'';$('fQuantity').value=i.quantity||1;$('fOperator').value=operatorName;$('fPlaylist').value=(i.playlist||[]).join('\n');$('fTags').value=(i.tags||[]).join('; ');$('fNotes').value=i.notes||'';
   }
@@ -909,7 +1008,7 @@ function formPayload(){
   const score=$('fMaterialType').value==='score';
   if(score){
     const isbn=$('fIsbn').value.replace(/[\s-]/g,'')||null;
-    return{barcode:isbn,material_type:'score',media_type:'楽譜',title:$('fScoreTitle').value.trim(),title_kana:null,artist:$('fScoreComposer').value.trim()||null,artist_kana:$('fComposerKana').value.trim()||null,composer:$('fScoreComposer').value.trim()||null,composer_kana:$('fComposerKana').value.trim()||null,lyricist:$('fLyricist').value.trim()||null,lyricist_kana:$('fLyricistKana').value.trim()||null,publisher:$('fPublisher').value.trim()||null,label:null,isbn,ismn:$('fIsmn').value.trim()||null,score_format:$('fScoreFormat').value||null,voicing_tags:selectedTagsFromHidden('fVoicingTags'),instrumentation_tags:selectedTagsFromHidden('fInstrumentationTags'),language_tags:selectedTagsFromHidden('fLanguageTags'),description:$('fDescription').value.trim()||null,notes:$('fScoreNotes').value.trim()||null,playlist:parseScoreContents($('fScoreContents').value).map(x=>x.title),genre:null,location:null,quantity:1,tags:[],needs_review:$('fNeedsReview').checked,cover_url:$('fCoverUrl').value||null,source_name:$('fSourceName').value||null,source_url:$('fSourceUrl').value||null,books_genre_id:$('fBooksGenreId').value||null,raw_source:(()=>{try{return $('fRawSource').value?JSON.parse($('fRawSource').value):null}catch{return null}})(),operator_name:operatorName};
+    return{barcode:isbn,material_type:'score',media_type:'楽譜',title:$('fScoreTitle').value.trim(),title_kana:null,artist:$('fScoreComposer').value.trim()||null,artist_kana:$('fComposerKana').value.trim()||null,composer:$('fScoreComposer').value.trim()||null,composer_kana:$('fComposerKana').value.trim()||null,lyricist:$('fLyricist').value.trim()||null,lyricist_kana:$('fLyricistKana').value.trim()||null,publisher:$('fPublisher').value.trim()||null,label:null,isbn,ismn:$('fIsmn').value.trim()||null,score_format:$('fScoreFormat').value||null,voicing_tags:selectedTagsFromHidden('fVoicingTags'),instrumentation_tags:selectedTagsFromHidden('fInstrumentationTags'),language_tags:selectedTagsFromHidden('fLanguageTags'),description:$('fDescription').value.trim()||null,notes:$('fScoreNotes').value.trim()||null,playlist:parseScoreContents($('fScoreContents').value).map(x=>x.title),genre:$('fScoreGenre').value||null,location:null,quantity:1,tags:[],needs_review:$('fNeedsReview').checked,cover_url:$('fCoverUrl').value||null,source_name:$('fSourceName').value||null,source_url:$('fSourceUrl').value||null,books_genre_id:$('fBooksGenreId').value||null,raw_source:(()=>{try{return $('fRawSource').value?JSON.parse($('fRawSource').value):null}catch{return null}})(),operator_name:operatorName};
   }
   return{barcode:$('fBarcode').value.trim()||null,material_type:'media',media_type:$('fMediaType').value,title:$('fTitle').value.trim(),title_kana:$('fTitleKana').value.trim()||null,artist:$('fArtist').value.trim()||null,artist_kana:$('fArtistKana').value.trim()||null,release_year:Number($('fYear').value)||null,release_date_text:$('fReleaseDateText').value.trim()||null,label:$('fLabel').value.trim()||null,catalog_no:$('fCatalogNo').value.trim()||null,disc_count:Number($('fDiscCount').value)||1,album_type:$('fAlbumType').value.trim()||null,composer:$('fComposer').value.trim()||null,conductor:$('fConductor').value.trim()||null,performers:$('fPerformers').value.trim()||null,ensemble:$('fEnsemble').value.trim()||null,genre:$('fGenre').value||null,location:$('fLocation').value.trim()||null,quantity:Number($('fQuantity').value)||1,playlist:$('fPlaylist').value.split(/\n+/).map(x=>x.trim()).filter(Boolean),tags:$('fTags').value.split(';').map(x=>x.trim()).filter(Boolean),notes:$('fNotes').value.trim()||null,needs_review:$('fNeedsReview').checked,cover_url:$('fCoverUrl').value||null,source_name:$('fSourceName').value||null,source_url:$('fSourceUrl').value||null,books_genre_id:$('fBooksGenreId').value||null,raw_source:(()=>{try{return $('fRawSource').value?JSON.parse($('fRawSource').value):null}catch{return null}})(),operator_name:operatorName};
 }
