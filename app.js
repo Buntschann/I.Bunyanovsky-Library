@@ -1,10 +1,10 @@
-const APP_VERSION="1.14.3";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.14.4";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
   voicing:["混声4部","混声3部","女声3部","女声2部","男声4部","男声3部","同声2部","同声3部","SATB","SAB","SSA","SSAA","TTBB","ユニゾン","div.","編成複数"],
   instrumentation:["無伴奏","伴奏あり","ピアノ","オルガン","フルート","ヴァイオリン","チェロ","弦楽合奏","管弦楽","吹奏楽","打楽器","その他伴奏"],
-  language:["日本語","英語","ラテン語","ドイツ語","フランス語","イタリア語","スペイン語","ロシア語","中国語","韓国語"]
+  language:["日本語","ローマ字","英語","ラテン語","ドイツ語","フランス語","イタリア語","スペイン語","ロシア語","中国語","韓国語","ヴォカリース"]
 };
 let scoreTagOptions={voicing:[],instrumentation:[],language:[]};
 let peopleMaster=[];
@@ -345,15 +345,17 @@ function inferLanguageTagsFromText(text){
   const out=[];
   const rules=[
     ["日本語",/(?:歌詞|言語|text|lyrics?)\s*[：:]?\s*日本語|日本語(?:歌詞|テキスト)?|Japanese/ig],
-    ["英語",/(?:歌詞|言語|text|lyrics?)\s*[：:]?\s*英語|英語(?:歌詞|テキスト)?|English/ig],
-    ["ラテン語",/(?:歌詞|言語)\s*[：:]?\s*ラテン語|ラテン語|Latin/ig],
-    ["ドイツ語",/(?:歌詞|言語)\s*[：:]?\s*ドイツ語|ドイツ語|German/ig],
-    ["フランス語",/(?:歌詞|言語)\s*[：:]?\s*フランス語|フランス語|French/ig],
-    ["イタリア語",/(?:歌詞|言語)\s*[：:]?\s*イタリア語|イタリア語|Italian/ig],
-    ["スペイン語",/(?:歌詞|言語)\s*[：:]?\s*スペイン語|スペイン語|Spanish/ig],
-    ["ロシア語",/(?:歌詞|言語)\s*[：:]?\s*ロシア語|ロシア語|Russian/ig],
-    ["中国語",/(?:歌詞|言語)\s*[：:]?\s*中国語|中国語|Chinese/ig],
-    ["韓国語",/(?:歌詞|言語)\s*[：:]?\s*韓国語|韓国語|Korean/ig]
+    ["ローマ字",/ローマ字|Romaji|Romanized(?:\s+Japanese)?/ig],
+    ["英語",/(?:歌詞|言語|text|lyrics?)\s*[：:]?\s*英語|英語(?:歌詞|テキスト)?|\bEnglish\b/ig],
+    ["ラテン語",/(?:歌詞|言語)\s*[：:]?\s*ラテン語|ラテン語|\bLatin\b/ig],
+    ["ドイツ語",/(?:歌詞|言語)\s*[：:]?\s*ドイツ語|ドイツ語|\bGerman\b/ig],
+    ["フランス語",/(?:歌詞|言語)\s*[：:]?\s*フランス語|フランス語|\bFrench\b/ig],
+    ["イタリア語",/(?:歌詞|言語)\s*[：:]?\s*イタリア語|イタリア語|\bItalian\b/ig],
+    ["スペイン語",/(?:歌詞|言語)\s*[：:]?\s*スペイン語|スペイン語|\bSpanish\b/ig],
+    ["ロシア語",/(?:歌詞|言語)\s*[：:]?\s*ロシア語|ロシア語|\bRussian\b/ig],
+    ["中国語",/(?:歌詞|言語)\s*[：:]?\s*中国語|中国語|\bChinese\b/ig],
+    ["韓国語",/(?:歌詞|言語)\s*[：:]?\s*韓国語|韓国語|\bKorean\b/ig],
+    ["ヴォカリース",/ヴォカリース|Vocalise/ig]
   ];
   for(const [name,re] of rules){
     re.lastIndex=0;
@@ -626,15 +628,25 @@ function mergePanamusicaStructuredTags(c){
   const voicingRaw=String(c?.voicing||c?.rawSource?.voicing||'');
   const accompRaw=String(c?.accompaniment||c?.rawSource?.accompaniment||'');
 
-  const rawLanguages=[
+  // Panamusica's language fields are authoritative when present.
+  const panaLanguageValues=uniqTags([
     ...(Array.isArray(c?.rawSource?.languages)?c.rawSource.languages:[]),
-    c?.language||'',
     ...(Array.isArray(c?.rawSource?.tracks)
-      ? c.rawSource.tracks.map(t=>t?.language||'')
+      ? c.rawSource.tracks.flatMap(t=>{
+          const v=t?.language;
+          if(Array.isArray(v))return v;
+          return v?[v]:[];
+        })
       : [])
-  ].filter(Boolean);
+  ]);
 
-  const languageRaw=rawLanguages.join(' / ');
+  const fallbackLanguageValues=uniqTags([
+    c?.language||'',
+    ...(Array.isArray(c?.language_tags)?c.language_tags:[]),
+    ...(Array.isArray(c?.languageTags)?c.languageTags:[])
+  ]);
+
+  const languageRaw=(panaLanguageValues.length?panaLanguageValues:fallbackLanguageValues).join(' / ');
 
   const inferredVoicing=[];
   if(/\bSATB\b/i.test(voicingRaw))inferredVoicing.push('SATB','混声4部');
@@ -667,11 +679,7 @@ function mergePanamusicaStructuredTags(c){
     ...inferredInst
   ]);
 
-  const language=uniqTags([
-    ...(Array.isArray(c?.language_tags)?c.language_tags:[]),
-    ...(Array.isArray(c?.languageTags)?c.languageTags:[]),
-    ...inferLanguageTagsFromText(languageRaw)
-  ]);
+  const language=uniqTags(inferLanguageTagsFromText(languageRaw));
 
   if(voicing.length){
     mergeSelectedTags('fVoicingTags',voicing);
@@ -682,7 +690,12 @@ function mergePanamusicaStructuredTags(c){
     renderTagPicker('instrumentation');
   }
   if(language.length){
-    mergeSelectedTags('fLanguageTags',language);
+    if(panaLanguageValues.length){
+      // Replace prior DB guesses such as an erroneous "英語".
+      saveSelectedTags('fLanguageTags',language);
+    }else{
+      mergeSelectedTags('fLanguageTags',language);
+    }
     renderTagPicker('language');
   }
   return voicing.length+instrumentation.length+language.length;
@@ -801,8 +814,10 @@ async function searchPanamusicaForCurrentTitle(){
     showPanamusicaCandidates(rows);
 
     if(rows.length){
+      const total=Number(data?.totalResults)||rows.length;
+      const suffix=data?.truncated?`（全${total}件中、先頭${rows.length}件）`:`（全${total}件）`;
       $('panamusicaCandidateStatus').textContent=
-        `「${title}」の検索結果：${rows.length}件。該当する商品を選んでください。`;
+        `「${title}」の検索結果：${rows.length}件 ${suffix}。該当する商品を選んでください。`;
     }else{
       $('panamusicaCandidateStatus').textContent=
         `「${title}」では候補が見つかりませんでした。商品URLの直接指定も利用できます。`;
