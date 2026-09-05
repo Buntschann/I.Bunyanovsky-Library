@@ -1,4 +1,4 @@
-const APP_VERSION="1.13.1";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.13.3";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
@@ -464,10 +464,22 @@ function applyPanamusicaCandidate(c){
   if(!c)return;
   let count=0;
 
-  // Bibliographic core remains from the barcode databases; Pana fills gaps/details.
+  // Once the user explicitly selects a Panamusica candidate,
+  // the score title and publisher follow the selected product page.
+  const panaTitle=c?.rawSource?.panamusicaTitle||c.title||'';
+  if(panaTitle && $('fScoreTitle').value.trim()!==panaTitle){
+    $('fScoreTitle').value=panaTitle;
+    count++;
+  }
+
+  if(c.publisher && $('fPublisher').value.trim()!==c.publisher){
+    $('fPublisher').value=c.publisher;
+    count++;
+  }
+
+  // Keep people fields conservative: fill only when empty.
   count+=fillIfEmpty('fScoreComposer',c.composer||c.artist)?1:0;
   count+=fillIfEmpty('fLyricist',c.lyricist)?1:0;
-  count+=fillIfEmpty('fPublisher',c.publisher)?1:0;
   count+=fillIfEmpty('fScoreFormat',c.scoreFormat||'合唱譜')?1:0;
 
   const v=Array.isArray(c.voicingTags)?c.voicingTags:[];
@@ -499,7 +511,7 @@ function applyPanamusicaCandidate(c){
   $('fRawSource').value=JSON.stringify(raw);
 
   autoFillScorePersonKana();
-  $('panamusicaCandidateStatus').textContent=`選択した候補から${count}項目を補完しました。`;
+  $('panamusicaCandidateStatus').textContent=`選択したパナムジカ候補を反映しました（${count}項目）。`;
   showToast(`パナムジカから${count}項目を補完しました`);
 }
 
