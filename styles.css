@@ -113,3 +113,23 @@
 }
 .panamusica-panel select{width:100%}
 .panamusica-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* v1.13.4 パナムジカ検索強化・URL直接指定 */
+.panamusica-search-row,
+.panamusica-url-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.panamusica-url-row input{
+  flex:1 1 320px;
+  min-width:0;
+}
+.panamusica-manual{
+  border-top:1px solid #e5e7eb;
+  padding-top:12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}

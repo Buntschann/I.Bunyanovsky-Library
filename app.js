@@ -1,4 +1,4 @@
-const APP_VERSION="1.13.3";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.13.4";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
@@ -220,12 +220,20 @@ function setEditorMaterialType(type){
   $('scoreFormSection').classList.toggle('hidden',!score);
   $('mediaFormSection').classList.toggle('hidden',score);
   $('enrichScoreBtn').classList.toggle('hidden',!score);
-  if(score)renderAllScoreTagPickers();autoFillScorePersonKana();
+  if(score){
+    renderAllScoreTagPickers();
+    $('panamusicaPanel')?.classList.remove('hidden');
+  }else{
+    $('panamusicaPanel')?.classList.add('hidden');
+  }
+  autoFillScorePersonKana();
 }
 updateRegistrationMode();updateMetadataSearchMode();
 $('fScoreContents').addEventListener('input',updateScoreContentCount);
 $('enrichScoreBtn').addEventListener('click',enrichCurrentScore);
 $('applyPanamusicaBtn')?.addEventListener('click',()=>{const i=Number($('panamusicaCandidateSelect').value);applyPanamusicaCandidate(panamusicaCandidates[i])});
+$('searchPanamusicaBtn')?.addEventListener('click',searchPanamusicaForCurrentTitle);
+$('loadPanamusicaUrlBtn')?.addEventListener('click',loadPanamusicaFromUrl);
 
 function splitTags(v){return String(v||'').split(/[;；\n]+/).map(x=>x.trim()).filter(Boolean)}
 
@@ -427,8 +435,8 @@ function clearPanamusicaCandidates(){
   const panel=$('panamusicaPanel');
   const select=$('panamusicaCandidateSelect');
   if(select)select.innerHTML='';
-  if(panel)panel.classList.add('hidden');
   if($('panamusicaCandidateStatus'))$('panamusicaCandidateStatus').textContent='';
+  if(panel && $('fMaterialType')?.value==='score')panel.classList.remove('hidden');
 }
 
 function panaCandidateLabel(c,index){
@@ -446,8 +454,14 @@ function panaCandidateLabel(c,index){
 function showPanamusicaCandidates(rows){
   clearPanamusicaCandidates();
   panamusicaCandidates=Array.isArray(rows)?rows:[];
-  if(!panamusicaCandidates.length)return;
   const select=$('panamusicaCandidateSelect');
+  if(!panamusicaCandidates.length){
+    const opt=document.createElement('option');
+    opt.value='';opt.textContent='候補なし';
+    select.appendChild(opt);
+    $('panamusicaPanel').classList.remove('hidden');
+    return;
+  }
   panamusicaCandidates.forEach((c,i)=>{
     const opt=document.createElement('option');
     opt.value=String(i);
@@ -540,6 +554,33 @@ async function searchPanamusicaForCurrentTitle(){
     $('panamusicaCandidateStatus').textContent='パナムジカ検索に失敗しました。';
   }
 }
+
+async function loadPanamusicaFromUrl(){
+  const url=$('panamusicaUrlInput').value.trim();
+  if(!url){showToast('パナムジカの商品URLを入力してください');return}
+  if(!/^https?:\/\/(?:www\.)?panamusica\.co\.jp\/ja\/product\/\d+\/?/i.test(url)){
+    showToast('パナムジカの商品ページURLを入力してください');
+    return;
+  }
+  $('panamusicaPanel').classList.remove('hidden');
+  $('panamusicaCandidateStatus').textContent='指定した商品ページを取得中…';
+  try{
+    const {data,error}=await sb.functions.invoke('lookup-media',{
+      body:{panamusicaUrl:url}
+    });
+    if(error)throw error;
+    if(!data?.candidate){
+      $('panamusicaCandidateStatus').textContent='指定した商品ページから情報を取得できませんでした。';
+      return;
+    }
+    showPanamusicaCandidates([data.candidate]);
+    $('panamusicaCandidateStatus').textContent='指定URLの商品を取得しました。「選んだ候補で補完」を押してください。';
+  }catch(err){
+    console.error(err);
+    $('panamusicaCandidateStatus').textContent='指定URLの取得に失敗しました。';
+  }
+}
+
 async function lookupBarcode(raw){
   const barcode=raw.replace(/\D/g,'');
   if(!barcode){
@@ -650,7 +691,7 @@ function mapServerCandidate(r,barcode){
 }
 function guessMediaType(r){const f=(r.media||[]).map(m=>(m.format||'').toLowerCase()).join(' ');if(f.includes('blu-ray'))return'Blu-ray';if(f.includes('dvd'))return'DVD';return'CD'}
 function openEditor(i){
-  $('editorCard').classList.remove('hidden');clearPanamusicaCandidates();
+  $('editorCard').classList.remove('hidden');clearPanamusicaCandidates();if($('panamusicaUrlInput'))$('panamusicaUrlInput').value='';
   const material=i.material_type||((i.media_type==='楽譜')?'score':'media');
   $('itemId').value=i.id||'';setEditorMaterialType(material);
   $('fCoverUrl').value=i.cover_url||'';$('fSourceName').value=i.source_name||'';$('fSourceUrl').value=i.source_url||'';$('fBooksGenreId').value=i.books_genre_id||'';$('fRawSource').value=i.raw_source?JSON.stringify(i.raw_source):'';updateCoverPreview(i.cover_url||'',i.source_name||'',i.source_url||'');
