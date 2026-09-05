@@ -1,4 +1,4 @@
-const APP_VERSION="1.11.6";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.12.0";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
@@ -7,6 +7,74 @@ const SCORE_TAG_DEFAULTS={
   language:["日本語","英語","ラテン語","ドイツ語","フランス語","イタリア語","スペイン語","ロシア語","中国語","韓国語"]
 };
 let scoreTagOptions={voicing:[],instrumentation:[],language:[]};
+let peopleMaster=[];
+
+function normalizePersonKey(name){
+  return String(name||"")
+    .normalize("NFKC")
+    .replace(/[\s　・･,，、]/g,"")
+    .toLowerCase();
+}
+
+async function loadPeopleMaster(){
+  try{
+    const {data,error}=await sb.from('people_master').select('*').order('name',{ascending:true});
+    if(error){console.warn('people_master load failed',error);return}
+    peopleMaster=data||[];
+  }catch(err){console.warn('people_master load failed',err)}
+}
+
+function findPersonMaster(name,role){
+  const key=normalizePersonKey(name);
+  if(!key)return null;
+  return peopleMaster.find(p=>{
+    if(role && p.role!==role)return false;
+    if(normalizePersonKey(p.name)===key)return true;
+    return (p.aliases||[]).some(a=>normalizePersonKey(a)===key);
+  })||null;
+}
+
+function autoFillPersonKana(nameId,kanaId,role){
+  const name=$(nameId)?.value?.trim()||'';
+  if(!name)return false;
+  const hit=findPersonMaster(name,role);
+  if(hit?.name_kana && !$(kanaId).value.trim()){
+    $(kanaId).value=hit.name_kana;
+    return true;
+  }
+  return false;
+}
+
+async function upsertPersonMaster(name,kana,role){
+  name=String(name||'').trim();
+  kana=String(kana||'').trim();
+  if(!name)return;
+
+  const existing=findPersonMaster(name,role);
+  if(existing){
+    const patch={updated_at:new Date().toISOString()};
+    if(kana && !existing.name_kana)patch.name_kana=kana;
+    if(Object.keys(patch).length>1){
+      const {error}=await sb.from('people_master').update(patch).eq('id',existing.id);
+      if(!error)Object.assign(existing,patch);
+    }
+    return;
+  }
+
+  const {data,error}=await sb.from('people_master')
+    .insert({name,name_kana:kana||null,role,aliases:[]})
+    .select('*').single();
+  if(!error && data)peopleMaster.push(data);
+}
+
+async function autoFillScorePersonKana(){
+  let changed=false;
+  changed=autoFillPersonKana('fScoreComposer','fComposerKana','composer')||changed;
+  changed=autoFillPersonKana('fLyricist','fLyricistKana','lyricist')||changed;
+  if(changed)showToast('人物マスターから読みを補完しました');
+}
+
+
 
 function uniqTags(values){
   const out=[];const seen=new Set();
@@ -117,6 +185,11 @@ $('manualBtn').addEventListener('click',()=>openEditor({material_type:$('registr
 $('addVoicingTagBtn')?.addEventListener('click',()=>addCustomScoreTag('voicing','newVoicingTag'));
 $('addInstrumentationTagBtn')?.addEventListener('click',()=>addCustomScoreTag('instrumentation','newInstrumentationTag'));
 $('addLanguageTagBtn')?.addEventListener('click',()=>addCustomScoreTag('language','newLanguageTag'));
+$('fScoreComposer')?.addEventListener('change',()=>autoFillPersonKana('fScoreComposer','fComposerKana','composer'));
+$('fScoreComposer')?.addEventListener('blur',()=>autoFillPersonKana('fScoreComposer','fComposerKana','composer'));
+$('fLyricist')?.addEventListener('change',()=>autoFillPersonKana('fLyricist','fLyricistKana','lyricist'));
+$('fLyricist')?.addEventListener('blur',()=>autoFillPersonKana('fLyricist','fLyricistKana','lyricist'));
+
 ['newVoicingTag','newInstrumentationTag','newLanguageTag'].forEach(id=>{
   $(id)?.addEventListener('keydown',e=>{
     if(e.key==='Enter'){
@@ -147,7 +220,7 @@ function setEditorMaterialType(type){
   $('scoreFormSection').classList.toggle('hidden',!score);
   $('mediaFormSection').classList.toggle('hidden',score);
   $('enrichScoreBtn').classList.toggle('hidden',!score);
-  if(score)renderAllScoreTagPickers();
+  if(score)renderAllScoreTagPickers();autoFillScorePersonKana();
 }
 updateRegistrationMode();updateMetadataSearchMode();
 $('fScoreContents').addEventListener('input',updateScoreContentCount);
@@ -227,7 +300,8 @@ async function enrichCurrentScore(){
       mergeSelectedTags('fLanguageTags',inferredLang);
       renderTagPicker('language');
       count++;
-    }if(!$('fScoreContents').value.trim()&&Array.isArray(m.contents)&&m.contents.length){$('fScoreContents').value=scoreContentsToText(m.contents);updateScoreContentCount();count++}if(!$('fCoverUrl').value&&m.coverUrl){$('fCoverUrl').value=m.coverUrl;updateCoverPreview(m.coverUrl,m.source||'外部データベース',m.sourceUrl||'');count++}if(Array.isArray(data?.sources))$('fRawSource').value=JSON.stringify({enrichmentSources:data.sources,candidates:data.candidates||[]});showToast(count?`${count}項目を補完しました`:'既存情報を優先したため変更はありません');}catch(err){console.error(err);showToast('メタデータ補完に失敗しました')}finally{btn.disabled=false;btn.textContent='外部DBから空欄を補完'}
+    }if(!$('fScoreContents').value.trim()&&Array.isArray(m.contents)&&m.contents.length){$('fScoreContents').value=scoreContentsToText(m.contents);updateScoreContentCount();count++}if(!$('fCoverUrl').value&&m.coverUrl){$('fCoverUrl').value=m.coverUrl;updateCoverPreview(m.coverUrl,m.source||'外部データベース',m.sourceUrl||'');count++}if(Array.isArray(data?.sources))$('fRawSource').value=JSON.stringify({enrichmentSources:data.sources,candidates:data.candidates||[]});await autoFillScorePersonKana();
+    showToast(count?`${count}項目を補完しました`:'既存情報を優先したため変更はありません');}catch(err){console.error(err);showToast('メタデータ補完に失敗しました')}finally{btn.disabled=false;btn.textContent='外部DBから空欄を補完'}
 }
 
 
@@ -474,7 +548,11 @@ $('itemForm').addEventListener('submit',async e=>{
   }
   if(error){alert('保存できませんでした。');return}
   try{
-    if(p.material_type==='score')await saveScoreContents(itemId);
+    if(p.material_type==='score'){
+      await saveScoreContents(itemId);
+      await upsertPersonMaster(p.composer,p.composer_kana,'composer');
+      await upsertPersonMaster(p.lyricist,p.lyricist_kana,'lyricist');
+    }
   }catch(err){console.error(err);alert('資料は保存しましたが、収録曲の保存に失敗しました。');}
   $('editorCard').classList.add('hidden');$('barcodeInput').value='';$('lookupMessage').textContent='保存しました。';await loadLibrary()
 });
@@ -503,7 +581,7 @@ async function deleteCurrentItem(){
     $('editorCard').classList.add('hidden');
     $('lookupMessage').textContent='削除しました。';
     showToast('資料を削除しました');
-    await loadLibrary();
+    await loadPeopleMaster();await loadLibrary();
   }catch(err){
     console.error(err);
     alert('削除できませんでした。Supabaseの削除権限を確認してください。');
