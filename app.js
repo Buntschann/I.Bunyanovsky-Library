@@ -1,9 +1,9 @@
-const APP_VERSION="1.12.0";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.13.0";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
-  voicing:["混声4部","混声3部","女声3部","女声2部","男声4部","男声3部","同声2部","同声3部","SATB","SAB","SSA","SSAA","TTBB","ユニゾン"],
-  instrumentation:["無伴奏","ピアノ","オルガン","フルート","ヴァイオリン","チェロ","弦楽合奏","管弦楽","吹奏楽","打楽器"],
+  voicing:["混声4部","混声3部","女声3部","女声2部","男声4部","男声3部","同声2部","同声3部","SATB","SAB","SSA","SSAA","TTBB","ユニゾン","div.","編成複数"],
+  instrumentation:["無伴奏","伴奏あり","ピアノ","オルガン","フルート","ヴァイオリン","チェロ","弦楽合奏","管弦楽","吹奏楽","打楽器","その他伴奏"],
   language:["日本語","英語","ラテン語","ドイツ語","フランス語","イタリア語","スペイン語","ロシア語","中国語","韓国語"]
 };
 let scoreTagOptions={voicing:[],instrumentation:[],language:[]};
@@ -122,7 +122,7 @@ function renderTagPicker(kind){
   if(!cfg||!box||!$(cfg.hidden))return;
   const selected=new Set(selectedTagsFromHidden(cfg.hidden).map(x=>String(x).toLowerCase()));
   box.innerHTML="";
-  const options=scoreTagOptions[kind]||[];
+  const options=uniqTags([...(scoreTagOptions[kind]||[]),...selectedTagsFromHidden(cfg.hidden)]);
   if(!options.length){box.innerHTML='<span class="tag-empty">候補はまだありません</span>';return}
   options.forEach(tag=>{
     const b=document.createElement("button");
@@ -510,7 +510,7 @@ function mapServerCandidate(r,barcode){
     books_genre_id:r.booksGenreId||'',
     raw_source:r.rawSource||null,
     artist:r.artist||'',
-    isbn:r.isbn||'',ismn:r.ismn||'',lyricist:r.lyricist||'',arranger:r.arranger||'',publisher:r.publisher||'',edition:r.edition||'',series:r.series||'',score_format:r.scoreFormat||'',voicing:r.voicing||'',accompaniment:r.accompaniment||'',language:r.language||'',page_count:r.pageCount||'',score_contents:Array.isArray(r.contents)?r.contents:[],
+    isbn:r.isbn||'',ismn:r.ismn||'',lyricist:r.lyricist||'',arranger:r.arranger||'',publisher:r.publisher||'',edition:r.edition||'',series:r.series||'',score_format:r.scoreFormat||'',voicing:r.voicing||'',accompaniment:r.accompaniment||'',language:r.language||'',page_count:r.pageCount||'',voicing_tags:Array.isArray(r.voicingTags)?r.voicingTags:[],instrumentation_tags:Array.isArray(r.instrumentationTags)?r.instrumentationTags:[],language_tags:uniqTags([...(Array.isArray(r.languageTags)?r.languageTags:[]),...inferLanguageTagsFromText([r.description,r.notes,r.rawSource?JSON.stringify(r.rawSource):''].join(' '))]),description:r.description||'',score_contents:Array.isArray(r.contents)?r.contents:[],
     release_year:r.year||'',
     label:r.label||'',
     catalog_no:r.catalogNo||'',
