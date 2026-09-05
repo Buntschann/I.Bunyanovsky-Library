@@ -1,3 +1,35 @@
+# I.Bunyanovsky Library v1.7.0
+
+I.Bunyanovsky Library v1.7.0
+
+バーコードなし検索を追加します。DBの追加変更はないためSQL実行は不要です。
+
+更新順
+1. Supabase → Edge Functions → lookup-media → Code/Edit
+   v1.7.0 の index.ts を全文貼り替え → Deploy
+2. GitHubで次を差し替え
+   - index.html
+   - styles.css
+   - app.js
+   - version.json
+   - update-history.json
+   config.jsは変更しない
+3. アプリ → 設定 → アプリを更新
+
+使い方
+新規登録 → 品番・タイトルから検索
+検索条件:
+- 規格品番
+- タイトル
+- アーティスト / 作曲者
+- レーベル / 発売元
+- 発売年
+
+規格品番だけの検索では、主にMusicBrainzとDiscogsが使われます。
+楽天ブックスCD/DVD APIはメーカー品番を直接検索する入力パラメータを持たないため、タイトル・アーティスト・レーベルが入力されている場合の補助検索として利用します。
+
+---
+
 # I.Bunyanovsky Library v1.4.0 — Archive Explorer
 
 v1.4.0では、バーコード検索の仕組みを大きく変更しました。
