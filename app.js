@@ -1,4 +1,4 @@
-const APP_VERSION="1.13.9";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.13.10";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
@@ -517,6 +517,36 @@ function showPanamusicaCandidates(rows){
     `${panamusicaCandidates.length}件見つかりました。該当する版を選んでください。`;
 }
 
+
+function mergePanamusicaStructuredTags(c){
+  const voicing=uniqTags([
+    ...(Array.isArray(c?.voicing_tags)?c.voicing_tags:[]),
+    ...(Array.isArray(c?.voicingTags)?c.voicingTags:[])
+  ]);
+  const instrumentation=uniqTags([
+    ...(Array.isArray(c?.instrumentation_tags)?c.instrumentation_tags:[]),
+    ...(Array.isArray(c?.instrumentationTags)?c.instrumentationTags:[])
+  ]);
+  const language=uniqTags([
+    ...(Array.isArray(c?.language_tags)?c.language_tags:[]),
+    ...(Array.isArray(c?.languageTags)?c.languageTags:[])
+  ]);
+
+  if(voicing.length){
+    mergeSelectedTags('fVoicingTags',voicing);
+    renderTagPicker('voicing');
+  }
+  if(instrumentation.length){
+    mergeSelectedTags('fInstrumentationTags',instrumentation);
+    renderTagPicker('instrumentation');
+  }
+  if(language.length){
+    mergeSelectedTags('fLanguageTags',language);
+    renderTagPicker('language');
+  }
+  return voicing.length+instrumentation.length+language.length;
+}
+
 function applyPanamusicaCandidate(c){
   if(!c)return;
   let count=0;
@@ -539,15 +569,8 @@ function applyPanamusicaCandidate(c){
   count+=fillIfEmpty('fLyricist',c.lyricist)?1:0;
   count+=fillIfEmpty('fScoreFormat',c.scoreFormat||'合唱譜')?1:0;
 
-  const v=Array.isArray(c.voicingTags)?c.voicingTags:[];
-  const inst=Array.isArray(c.instrumentationTags)?c.instrumentationTags:[];
-  const lang=uniqTags([
-    ...(Array.isArray(c.languageTags)?c.languageTags:[]),
-    ...inferLanguageTagsFromText([c.language,c.description,c.rawSource?JSON.stringify(c.rawSource):''].join(' '))
-  ]);
-  if(v.length){mergeSelectedTags('fVoicingTags',v);renderTagPicker('voicing');count++}
-  if(inst.length){mergeSelectedTags('fInstrumentationTags',inst);renderTagPicker('instrumentation');count++}
-  if(lang.length){mergeSelectedTags('fLanguageTags',lang);renderTagPicker('language');count++}
+  const addedTagCount=mergePanamusicaStructuredTags(c);
+  if(addedTagCount)count++;
 
   if(Array.isArray(c.contents)&&c.contents.length){
     // Pana's explicit 曲目情報 is authoritative for the contents list.
