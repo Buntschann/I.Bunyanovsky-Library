@@ -1,4 +1,4 @@
-const APP_VERSION="1.14.0";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.14.1";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
@@ -244,19 +244,22 @@ function mergeSelectedTags(hiddenId,values){
 function inferLanguageTagsFromText(text){
   const t=String(text||"");
   const out=[];
-  const pairs=[
-    ["日本語",/(?:歌詞|言語|text|lyrics?)\s*[：:]?\s*日本語|日本語(?:歌詞|テキスト)?|Japanese/i],
-    ["英語",/(?:歌詞|言語|text|lyrics?)\s*[：:]?\s*英語|英語(?:歌詞|テキスト)?|English/i],
-    ["ラテン語",/(?:歌詞|言語)\s*[：:]?\s*ラテン語|Latin/i],
-    ["ドイツ語",/(?:歌詞|言語)\s*[：:]?\s*ドイツ語|German/i],
-    ["フランス語",/(?:歌詞|言語)\s*[：:]?\s*フランス語|French/i],
-    ["イタリア語",/(?:歌詞|言語)\s*[：:]?\s*イタリア語|Italian/i],
-    ["スペイン語",/(?:歌詞|言語)\s*[：:]?\s*スペイン語|Spanish/i],
-    ["ロシア語",/(?:歌詞|言語)\s*[：:]?\s*ロシア語|Russian/i],
-    ["中国語",/(?:歌詞|言語)\s*[：:]?\s*中国語|Chinese/i],
-    ["韓国語",/(?:歌詞|言語)\s*[：:]?\s*韓国語|Korean/i]
+  const rules=[
+    ["日本語",/(?:歌詞|言語|text|lyrics?)\s*[：:]?\s*日本語|日本語(?:歌詞|テキスト)?|Japanese/ig],
+    ["英語",/(?:歌詞|言語|text|lyrics?)\s*[：:]?\s*英語|英語(?:歌詞|テキスト)?|English/ig],
+    ["ラテン語",/(?:歌詞|言語)\s*[：:]?\s*ラテン語|ラテン語|Latin/ig],
+    ["ドイツ語",/(?:歌詞|言語)\s*[：:]?\s*ドイツ語|ドイツ語|German/ig],
+    ["フランス語",/(?:歌詞|言語)\s*[：:]?\s*フランス語|フランス語|French/ig],
+    ["イタリア語",/(?:歌詞|言語)\s*[：:]?\s*イタリア語|イタリア語|Italian/ig],
+    ["スペイン語",/(?:歌詞|言語)\s*[：:]?\s*スペイン語|スペイン語|Spanish/ig],
+    ["ロシア語",/(?:歌詞|言語)\s*[：:]?\s*ロシア語|ロシア語|Russian/ig],
+    ["中国語",/(?:歌詞|言語)\s*[：:]?\s*中国語|中国語|Chinese/ig],
+    ["韓国語",/(?:歌詞|言語)\s*[：:]?\s*韓国語|韓国語|Korean/ig]
   ];
-  for(const [name,re] of pairs)if(re.test(t))out.push(name);
+  for(const [name,re] of rules){
+    re.lastIndex=0;
+    if(re.test(t))out.push(name);
+  }
   return uniqTags(out);
 }
 function parseScoreContents(text){
@@ -523,7 +526,16 @@ function showPanamusicaCandidates(rows){
 function mergePanamusicaStructuredTags(c){
   const voicingRaw=String(c?.voicing||c?.rawSource?.voicing||'');
   const accompRaw=String(c?.accompaniment||c?.rawSource?.accompaniment||'');
-  const languageRaw=String(c?.language||(c?.rawSource?.languages||[]).join(' ')||'');
+
+  const rawLanguages=[
+    ...(Array.isArray(c?.rawSource?.languages)?c.rawSource.languages:[]),
+    c?.language||'',
+    ...(Array.isArray(c?.rawSource?.tracks)
+      ? c.rawSource.tracks.map(t=>t?.language||'')
+      : [])
+  ].filter(Boolean);
+
+  const languageRaw=rawLanguages.join(' / ');
 
   const inferredVoicing=[];
   if(/\bSATB\b/i.test(voicingRaw))inferredVoicing.push('SATB','混声4部');
@@ -549,11 +561,13 @@ function mergePanamusicaStructuredTags(c){
     ...(Array.isArray(c?.voicingTags)?c.voicingTags:[]),
     ...inferredVoicing
   ]);
+
   const instrumentation=uniqTags([
     ...(Array.isArray(c?.instrumentation_tags)?c.instrumentation_tags:[]),
     ...(Array.isArray(c?.instrumentationTags)?c.instrumentationTags:[]),
     ...inferredInst
   ]);
+
   const language=uniqTags([
     ...(Array.isArray(c?.language_tags)?c.language_tags:[]),
     ...(Array.isArray(c?.languageTags)?c.languageTags:[]),
