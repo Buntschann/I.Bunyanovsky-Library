@@ -1,4 +1,4 @@
-const APP_VERSION="1.13.0";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.13.1";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
@@ -225,6 +225,7 @@ function setEditorMaterialType(type){
 updateRegistrationMode();updateMetadataSearchMode();
 $('fScoreContents').addEventListener('input',updateScoreContentCount);
 $('enrichScoreBtn').addEventListener('click',enrichCurrentScore);
+$('applyPanamusicaBtn')?.addEventListener('click',()=>{const i=Number($('panamusicaCandidateSelect').value);applyPanamusicaCandidate(panamusicaCandidates[i])});
 
 function splitTags(v){return String(v||'').split(/[;；\n]+/).map(x=>x.trim()).filter(Boolean)}
 
@@ -287,7 +288,7 @@ async function enrichCurrentScore(){
   if($('fMaterialType').value!=='score')return;
   const btn=$('enrichScoreBtn');btn.disabled=true;btn.textContent='外部DBを探索中…';
   const search={materialType:'score',isbn:$('fIsbn').value.trim(),ismn:$('fIsmn').value.trim(),title:$('fScoreTitle').value.trim(),artist:$('fScoreComposer').value.trim(),label:$('fPublisher').value.trim(),enrich:true};
-  try{const{data,error}=await sb.functions.invoke('lookup-media',{body:{search,providers:providerSettings}});if(error)throw error;const m=data?.merged||data?.best||data?.candidates?.[0];if(!m){showToast('追加情報は見つかりませんでした');return}let count=0;count+=fillIfEmpty('fScoreTitle',m.title)?1:0;count+=fillIfEmpty('fScoreComposer',m.composer||m.artist)?1:0;count+=fillIfEmpty('fLyricist',m.lyricist)?1:0;count+=fillIfEmpty('fPublisher',m.publisher||m.label)?1:0;count+=fillIfEmpty('fIsbn',m.isbn)?1:0;count+=fillIfEmpty('fIsmn',m.ismn)?1:0;count+=fillIfEmpty('fScoreFormat',m.scoreFormat)?1:0;count+=fillIfEmpty('fDescription',m.description||'')?1:0;
+  try{const{data,error}=await sb.functions.invoke('lookup-media',{body:{search,providers:providerSettings}});if(error)throw error;const m=data?.merged||data?.best||data?.candidates?.[0];showPanamusicaCandidates(data?.panamusicaCandidates||[]);if(!m){showToast('追加情報は見つかりませんでした');return}let count=0;count+=fillIfEmpty('fScoreTitle',m.title)?1:0;count+=fillIfEmpty('fScoreComposer',m.composer||m.artist)?1:0;count+=fillIfEmpty('fLyricist',m.lyricist)?1:0;count+=fillIfEmpty('fPublisher',m.publisher||m.label)?1:0;count+=fillIfEmpty('fIsbn',m.isbn)?1:0;count+=fillIfEmpty('fIsmn',m.ismn)?1:0;count+=fillIfEmpty('fScoreFormat',m.scoreFormat)?1:0;count+=fillIfEmpty('fDescription',m.description||'')?1:0;
     const inferredLang=uniqTags([
       ...(m.languageTags||[]),
       ...inferLanguageTagsFromText([
@@ -418,6 +419,115 @@ function selectMetadataCandidate(item){
   showSource(`取得元：${item.source||'-'} / バーコードなし検索`);
 }
 
+
+let panamusicaCandidates=[];
+
+function clearPanamusicaCandidates(){
+  panamusicaCandidates=[];
+  const panel=$('panamusicaPanel');
+  const select=$('panamusicaCandidateSelect');
+  if(select)select.innerHTML='';
+  if(panel)panel.classList.add('hidden');
+  if($('panamusicaCandidateStatus'))$('panamusicaCandidateStatus').textContent='';
+}
+
+function panaCandidateLabel(c,index){
+  const raw=c?.rawSource||{};
+  const title=raw.panamusicaTitle||c.title||`候補${index+1}`;
+  const bits=[
+    c.voicing||'',
+    c.accompaniment||'',
+    c.publisher||'',
+    raw.panamusicaCode?`コード ${raw.panamusicaCode}`:''
+  ].filter(Boolean);
+  return bits.length?`${title} ｜ ${bits.join(' / ')}`:title;
+}
+
+function showPanamusicaCandidates(rows){
+  clearPanamusicaCandidates();
+  panamusicaCandidates=Array.isArray(rows)?rows:[];
+  if(!panamusicaCandidates.length)return;
+  const select=$('panamusicaCandidateSelect');
+  panamusicaCandidates.forEach((c,i)=>{
+    const opt=document.createElement('option');
+    opt.value=String(i);
+    opt.textContent=panaCandidateLabel(c,i);
+    select.appendChild(opt);
+  });
+  $('panamusicaPanel').classList.remove('hidden');
+  $('panamusicaCandidateStatus').textContent=
+    panamusicaCandidates.length===1?'1件見つかりました。内容を確認して補完してください。':
+    `${panamusicaCandidates.length}件見つかりました。該当する版を選んでください。`;
+}
+
+function applyPanamusicaCandidate(c){
+  if(!c)return;
+  let count=0;
+
+  // Bibliographic core remains from the barcode databases; Pana fills gaps/details.
+  count+=fillIfEmpty('fScoreComposer',c.composer||c.artist)?1:0;
+  count+=fillIfEmpty('fLyricist',c.lyricist)?1:0;
+  count+=fillIfEmpty('fPublisher',c.publisher)?1:0;
+  count+=fillIfEmpty('fScoreFormat',c.scoreFormat||'合唱譜')?1:0;
+
+  const v=Array.isArray(c.voicingTags)?c.voicingTags:[];
+  const inst=Array.isArray(c.instrumentationTags)?c.instrumentationTags:[];
+  const lang=uniqTags([
+    ...(Array.isArray(c.languageTags)?c.languageTags:[]),
+    ...inferLanguageTagsFromText([c.language,c.description,c.rawSource?JSON.stringify(c.rawSource):''].join(' '))
+  ]);
+  if(v.length){mergeSelectedTags('fVoicingTags',v);renderTagPicker('voicing');count++}
+  if(inst.length){mergeSelectedTags('fInstrumentationTags',inst);renderTagPicker('instrumentation');count++}
+  if(lang.length){mergeSelectedTags('fLanguageTags',lang);renderTagPicker('language');count++}
+
+  if(Array.isArray(c.contents)&&c.contents.length){
+    // Pana's explicit 曲目情報 is authoritative for the contents list.
+    $('fScoreContents').value=scoreContentsToText(c.contents);
+    updateScoreContentCount();
+    count++;
+  }
+
+  if(c.description && !$('fDescription').value.trim()){
+    $('fDescription').value=c.description;
+    count++;
+  }
+
+  // Preserve previous raw data and attach selected Panamusica data.
+  let raw={};
+  try{raw=$('fRawSource').value?JSON.parse($('fRawSource').value):{}}catch{}
+  raw.panamusicaSelected=c.rawSource||c;
+  $('fRawSource').value=JSON.stringify(raw);
+
+  autoFillScorePersonKana();
+  $('panamusicaCandidateStatus').textContent=`選択した候補から${count}項目を補完しました。`;
+  showToast(`パナムジカから${count}項目を補完しました`);
+}
+
+async function searchPanamusicaForCurrentTitle(){
+  if($('fMaterialType').value!=='score')return;
+  const title=$('fScoreTitle').value.trim();
+  if(!title){showToast('先に楽譜名を取得してください');return}
+  $('panamusicaCandidateStatus').textContent='パナムジカを検索中…';
+  try{
+    const {data,error}=await sb.functions.invoke('lookup-media',{
+      body:{
+        panamusicaSearch:true,
+        title,
+        composer:$('fScoreComposer').value.trim()
+      }
+    });
+    if(error)throw error;
+    showPanamusicaCandidates(data?.candidates||[]);
+    if(!(data?.candidates||[]).length){
+      $('panamusicaPanel').classList.remove('hidden');
+      $('panamusicaCandidateStatus').textContent='パナムジカでは候補が見つかりませんでした。';
+    }
+  }catch(err){
+    console.error(err);
+    $('panamusicaPanel').classList.remove('hidden');
+    $('panamusicaCandidateStatus').textContent='パナムジカ検索に失敗しました。';
+  }
+}
 async function lookupBarcode(raw){
   const barcode=raw.replace(/\D/g,'');
   if(!barcode){
@@ -457,6 +567,9 @@ async function lookupBarcode(raw){
 
     const best=data.best;
     openEditor(mapServerCandidate(best,barcode));
+    if($('registrationMaterialType').value==='score'){
+      showPanamusicaCandidates(data.panamusicaCandidates||[]);
+    }
 
     const otherCount=Math.max(0,(data.candidates?.length||1)-1);
     $('lookupMessage').textContent=otherCount
@@ -525,7 +638,7 @@ function mapServerCandidate(r,barcode){
 }
 function guessMediaType(r){const f=(r.media||[]).map(m=>(m.format||'').toLowerCase()).join(' ');if(f.includes('blu-ray'))return'Blu-ray';if(f.includes('dvd'))return'DVD';return'CD'}
 function openEditor(i){
-  $('editorCard').classList.remove('hidden');
+  $('editorCard').classList.remove('hidden');clearPanamusicaCandidates();
   const material=i.material_type||((i.media_type==='楽譜')?'score':'media');
   $('itemId').value=i.id||'';setEditorMaterialType(material);
   $('fCoverUrl').value=i.cover_url||'';$('fSourceName').value=i.source_name||'';$('fSourceUrl').value=i.source_url||'';$('fBooksGenreId').value=i.books_genre_id||'';$('fRawSource').value=i.raw_source?JSON.stringify(i.raw_source):'';updateCoverPreview(i.cover_url||'',i.source_name||'',i.source_url||'');
