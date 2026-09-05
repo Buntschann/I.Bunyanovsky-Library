@@ -1,4 +1,4 @@
-const APP_VERSION="1.14.2";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
+const APP_VERSION="1.14.3";const VERSION_URL="./version.json";const HISTORY_URL="./update-history.json";const cfg=window.APP_CONFIG||{};const configured=cfg.SUPABASE_URL&&cfg.SUPABASE_PUBLISHABLE_KEY&&cfg.SHARED_AUTH_EMAIL&&!String(cfg.SUPABASE_URL).includes("YOUR_")&&!String(cfg.SUPABASE_PUBLISHABLE_KEY).includes("YOUR_");const $=id=>document.getElementById(id);let sb=null,library=[],scanner=null,operatorName=localStorage.getItem("ib_operator_name")||"";$('currentVersionText').textContent=`v${APP_VERSION}`;
 
 
 const SCORE_TAG_DEFAULTS={
@@ -705,8 +705,19 @@ function applyPanamusicaCandidate(c){
     count++;
   }
 
-  // Keep people fields conservative: fill only when empty.
-  count+=fillIfEmpty('fScoreComposer',c.composer||c.artist)?1:0;
+  // Panamusica is authoritative for the composer when the selected product has one.
+  const panaComposer=String(c.composer||c.artist||'').trim();
+  if(panaComposer){
+    const currentComposer=$('fScoreComposer').value.trim();
+    if(currentComposer!==panaComposer){
+      $('fScoreComposer').value=panaComposer;
+      // The existing kana may belong to the previous composer, so clear it.
+      $('fComposerKana').value='';
+      count++;
+    }
+  }
+
+  // Lyricist remains conservative for now: fill only when empty.
   count+=fillIfEmpty('fLyricist',c.lyricist)?1:0;
   count+=fillIfEmpty('fScoreFormat',c.scoreFormat||'合唱譜')?1:0;
 
